@@ -287,43 +287,40 @@ JXON.prototype = {
 
 if (!this.JSON){
 
-	JXON.prototype += {
-		toJSON : function (){
-			var str = (function (object){
-				var str = '';
-				if (object instanceof Array){
-					str += '[';
-					for (var i = 0;i < object.length;i++){
-						str += ''+arguments.callee(object[i])+((i < object.length - 1) ? ',' : '');
-					}
-					str += ']';
-				}else if(object instanceof JXON){
-					str += '{';
-					for (var p in object){
-						if (object[p] == null || object[p].constructor != Function){
-							str += '"'+p+'":'+arguments.callee(object[p])+',';
-						}
-					}
-					str = str.substring(0, str.length - 1);
-					str += '}';
-				}else{
-					switch (typeof(parseText(object))){
-						case 'string':
-							str = '"'+escapeJS(object)+'"';
-								break;
-						case 'number':
-						case 'boolean':
-							str = parseText(object);
-							break;
-						default:
-							str = (parseText(object)) ? object : null;
-						break;
+	JXON.prototype.toJSON = function (){
+		return (function (object){
+			var str = '';
+			if (object instanceof Array){
+				str += '[';
+				for (var i = 0;i < object.length;i++){
+					str += ''+arguments.callee(object[i])+((i < object.length - 1) ? ',' : '');
+				}
+				str += ']';
+			}else if(object instanceof JXON){
+				str += '{';
+				for (var p in object){
+					if (object[p] == null || object[p].constructor != Function){
+						str += '"'+p+'":'+arguments.callee(object[p])+',';
 					}
 				}
-				return str;
-			})(this);	
+				str = str.substring(0, str.length - 1);
+				str += '}';
+			}else{
+				switch (typeof(parseText(object))){
+					case 'string':
+						str = '"'+escapeJS(object)+'"';
+						break;
+					case 'number':
+					case 'boolean':
+						str = parseText(object);
+						break;
+					default:
+						str = (parseText(object)) ? object : null;
+					break;
+				}
+			}
 			return str;
-		}
+		})(this);
 	}
 }
 
