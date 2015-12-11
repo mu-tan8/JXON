@@ -16,36 +16,53 @@
 
 	//object to JXONObject
 		var object = {'form':{'@method':'post','@action':'.','input':[{'@name':'uname'},{'@name':'upw','@type':'password'},{'@type':'submit','@value':'login'}]}};
-		var JXON = new JXON(object);
+		var jxon = new JXON(object);
 	//XML or HTML to JXONObject
-		var JXON = new JXON().build(doc);
+		var jxon = new JXON();
+		jxon.build(doc);
 	//JXONObject to HTML on browser
-		var HTMLNode = JXON.toDOM();
+		var HTMLNode = jxon.toDOM();
 		//document.body.appendChild(HTMLNode);
-	//get HTML Strings value option (near eq. JXON.toDOM().innerHTML;)
-		var HTMLStrings = JXON.toDOMString();
+	//get HTML Strings value option (near eq. jxon.toDOM().innerHTML;)
+		var HTMLStrings = jxon.toDOMString();
 	//JXONObject to XML
-		var XMLNode = JXON.toDOM(XMLObject);
+		var XMLNode = jxon.toDOM(XMLObject);
 		//XMLObject.getElementsByTagName('node')[0].appendChild(XMLNode);
+
+	//JSON not support version only
+		var JSON = jxon.toJSON();
 */
 
-var JXONTree = function (object){
-	JXON.call(this , object);
-	this.build = function (){};
+function JXONTree(object){
+	var mySelfObject = (this instanceof JXONTree) ? this : new JXONTree(object) ;
+	JXON.call(mySelfObject , object);
+	mySelfObject.build = function (){};
+	return mySelfObject;
 }
 
 function JXON(object){
 
-	var myObject = this ;
+	var mySelfObject = (this instanceof JXON) ? this : new JXON(object) ;
+
 	var mes = (function(obj,myObject){
 		if (obj instanceof Array){
+			callBackf(''+obj.toString());
 			return 'Object construction error';
 		}else if(obj instanceof Object){
 			for (var p in obj){
 				if (/^(:|\d|.+[@#!?$%\"\'\=\<\>\/\\\s])/.test(p)){
-					return 'Object illegal name';
-				}else if (/^(@xmlns:?[\w]*|@[\w]+:?[\w]+|#text)$/.test(p)){
+					callBackf(''+p.toString());
+					return 'invalid property name';
+				}else if (/^@xmlns:?[\w]*$/.test(p)){
+					if (!/^https?:\/\/[\w]+\.[\w\/\.]+/.test(obj[p])){
+						callBackf(''+p+':'+obj[p].toString());
+						return 'invalid property value';
+					}else{
+						myObject[p] = parseText(escapeJS(obj[p]));
+					}
+				}else if (/^(@[\w]+:?[\w]+|#text)$/.test(p)){
 					if (obj[p] instanceof Array || obj[p] instanceof Object){
+						callBackf(''+p+':'+obj[p].toString());
 						return 'Object construction error';
 					}else {
 						myObject[p] = parseText(escapeJS(obj[p]));
@@ -70,16 +87,24 @@ function JXON(object){
 				p = void(null);
 			}
 		}
-	})(object,myObject);
+	})(object,mySelfObject);
 	if (mes){
 		e = new Error(mes);
 		e.name = 'JXONError';
 		throw e;
 	}
-	return myObject;
+
+	return mySelfObject;
 }
 
 
+	function callBackf(mes){
+		try {
+			console.error(mes);
+		}catch (e){
+			Debug.write(mes);
+		}
+	}
 	function escapeJS(str){
 		return String(str).replace(/\\/gm,"\\\\").replace(/\"|\&quot\;/gm,"\\\"").replace(/\n|\&#010\;/gm,"\\n");
 	}
@@ -117,20 +142,40 @@ function JXON(object){
 
 JXON.prototype = {
 
-	empty : function(){
-		var myObject = this;
-		for (var p in myObject){
-			myObject[p] = void(myObject[p]);
-			p = void(null);
+
+	toString : function (){
+		if (typeof(this)=='object'){
+			if (this instanceof Array){
+				return '[object Array]';
+			}else if(this instanceof JXON){
+				return '[object JXONObject]';
+			}else if(this == null){
+				return String(null);
+			}else{
+				return String(this);
+			}
+		}else{
+			return String(parseText(this));
 		}
-		return new JXONTree();
 	},
 
+
+
+	empty : function(){
+		for (var p in this){
+			if (this[p] == null || this[p].constructor != Function){
+				delete this[p];
+			}
+			p = void(null);
+		}
+	},
+
+
+
 	build : function(oDoc){
-		var myObject = this;
 		if (!oDoc){return false};
 		if (!'childNodes' in oDoc){return false};
-		myObject = myObject.empty();
+		this.empty();
 		(function(oNode , object){
 			var oNodes = oNode.childNodes;
 			for (var i = 0;i < oNodes.length;i++){
@@ -172,25 +217,26 @@ JXON.prototype = {
 				name = value = void(null);
 			}
 			oNodes = i = void(null);
-		})(oDoc,myObject);
-		return myObject;
+		})(oDoc,this);
+		return this;
 	},
 
+
+
 	toDOM : function(oDocument){
-		var myObject = this;
 		var oDocument = oDocument || document;
 		if (!'createElement' in oDocument){return false};
 		var oRoot = oDocument.createElement('div');
 		if (!'appendChild' in oRoot){return false};
 		(function(object,oNode){
 			for (var p in object){
-				if (object[p] === null || object[p].constructor != Function){
+				if (object[p] == null || object[p].constructor != Function){
 					if (/^@xmlns:?([\w]+)?$/.exec(p)){
 					}else if (/^@([\w]+:?[\w]+)$/.exec(p)){
 						oNode.setAttribute(RegExp.lastParen , unescapeJS(object[p]));
 					}else if (/^#text$/.test(p)){
 						if (object[p]){
-							oNode.appendChild((hasMarkup(object[p]) && 'createCDATASection' in oDocument) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
+							oNode.appendChild((hasMarkup(object[p]) && ('createCDATASection' in oDocument && oRoot.tagName == 'div')) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
 						}
 					}else {
 						if (object[p] instanceof Array){
@@ -202,19 +248,21 @@ JXON.prototype = {
 							arguments.callee(object[p] , oNode.appendChild(oDocument.createElement(p)));
 						}else{
 							if(parseText(object[p]) != null){
-								oNode.appendChild(oDocument.createElement(p)).appendChild((hasMarkup(object[p]) && 'createCDATASection' in oDocument) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
+								oNode.appendChild(oDocument.createElement(p)).appendChild((hasMarkup(object[p]) &&('createCDATASection' in oDocument && oRoot.tagName == 'div')) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
 							}else{
 								oNode.appendChild(oDocument.createElement(p));
 							}
 						}
 					}
-					p = void(null);
 				}
+				p = void(null);
 			}
-		})(myObject,oRoot);
+		})(this,oRoot);
 		oDocument = void(null);
 		return (oRoot.childNodes.length > 1) ? oRoot.childNodes : oRoot.lastChild ;
 	},
+
+
 
 	toDOMString : function (oDocument){
 		var oDocument = oDocument || document;
@@ -235,6 +283,50 @@ JXON.prototype = {
 	}
 
 }
+
+
+if (!this.JSON){
+
+	JXON.prototype += {
+		toJSON : function (){
+			var str = (function (object){
+				var str = '';
+				if (object instanceof Array){
+					str += '[';
+					for (var i = 0;i < object.length;i++){
+						str += ''+arguments.callee(object[i])+((i < object.length - 1) ? ',' : '');
+					}
+					str += ']';
+				}else if(object instanceof JXON){
+					str += '{';
+					for (var p in object){
+						if (object[p] == null || object[p].constructor != Function){
+							str += '"'+p+'":'+arguments.callee(object[p])+',';
+						}
+					}
+					str = str.substring(0, str.length - 1);
+					str += '}';
+				}else{
+					switch (typeof(parseText(object))){
+						case 'string':
+							str = '"'+escapeJS(object)+'"';
+								break;
+						case 'number':
+						case 'boolean':
+							str = parseText(object);
+							break;
+						default:
+							str = (parseText(object)) ? object : null;
+						break;
+					}
+				}
+				return str;
+			})(this);	
+			return str;
+		}
+	}
+}
+
 
 JXONTree.prototype = JXON.prototype;
 JXONTree.prototype.constructor = JXONTree;

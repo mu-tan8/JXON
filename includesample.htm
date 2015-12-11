@@ -2,7 +2,9 @@
 <script>//<!--
 /*	oXML = new ActiveXObject('Microsoft.XMLDOM');
 	oXML.load('test.xml');
-*/	document.writeln(new JXON({'form':{'@method':'post','@action':'.','input':[{'@name':'uname'},{'@name':'upw','@type':'password'},{'@type':'submit','@value':'login'}]}}).toDOMString());
-
+	document.writeln(
+*/	var jxon = new JXON({'form':{'@method':'post','@action':'.','input':[{'@name':'uname'},{'@name':'upw','@type':'password'},{'@type':'submit','@value':'login'}]}});
+	jxon.build(document);
+	alert(jxon.toDOMString());
 //	alert(new JXON().build(oXML).toDOM(oXML).xml);
 //--></script>
