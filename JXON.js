@@ -6,6 +6,8 @@
 
 	This is unofficial library.
 
+	Distribute & Documents  https://github.com/mu-tan8/JXON
+
 	MIT Lisence Copyright (c) 2015 mu-tan8(theta)
 
 */
@@ -14,9 +16,11 @@
 /*
 	How To Use
 
-	//object to JXONObject
+	//Object to JXONObject
 		var object = {'form':{'@method':'post','@action':'.','input':[{'@name':'uname'},{'@name':'upw','@type':'password'},{'@type':'submit','@value':'login'}]}};
 		var jxon = new JXON(object);
+	//JXONTreeObject add JXONTreeObject
+		jxon.form.appendBranch({'#text':'test'});
 	//XML or HTML to JXONObject
 		var jxon = new JXON();
 		jxon.build(doc);
@@ -53,14 +57,14 @@ function JXON(object){
 				if (/^(:|\d|.+[@#!?$%\"\'\=\<\>\/\\\s])/.test(p)){
 					callBackf(''+p.toString());
 					return 'invalid property name';
-				}else if (/^@xmlns:?[\w]*$/.test(p)){
+				}else if (/^@xmlns:?[\w\-]*$/.test(p)){
 					if (!/^https?:\/\/[\w]+\.[\w\/\.]+/.test(obj[p])){
 						callBackf(''+p+':'+obj[p].toString());
 						return 'invalid property value';
 					}else{
 						myObject[p] = parseText(escapeJS(obj[p]));
 					}
-				}else if (/^(@[\w]+:?[\w]+|#text)$/.test(p)){
+				}else if (/^(@[\w\-]+:?[\w\-]+|\?([\w\-]+)|#text|#comment)$/i.test(p)){
 					if (obj[p] instanceof Array || obj[p] instanceof Object){
 						callBackf(''+p+':'+obj[p].toString());
 						return 'Object construction error';
@@ -115,7 +119,7 @@ function JXON(object){
 		return (/[\<\>]|\&lt\;|\&gt\;/m.test(str) && !/\]\](\>|\&gt\;)/m.test(str));
 	}
 	function parseText(value){
-		if (/^\s*$|null/i.test(value)){
+		if (/^\s*$|^null$/i.test(value)){
 			return null;
 		}else if(/^(true|false)$/i.test(value)){
 			return (String(value).toLowerCase() === "true");
@@ -172,6 +176,13 @@ JXON.prototype = {
 
 
 
+	appendBranch : function(object){
+		JXONTree.call(this , object);
+		return this;
+	},
+
+
+
 	build : function(oDoc){
 		if (!oDoc){return false};
 		if (!'childNodes' in oDoc){return false};
@@ -182,13 +193,13 @@ JXON.prototype = {
 				var name = oNodes[i].nodeName;
 				var value = oNodes[i].nodeValue;
 				switch (oNodes[i].nodeType){
-					case 1 :	//ELEMENT
+					case 1 :	//ELEMENT_NODE
 						var oNodeLists = getNamedChildren(oNode,name);
 						if (oNodeLists.length > 1){
 							object[name] = [];
 							for (var n = 0;n < oNodeLists.length;n++){
 								object[name][n] = new JXONTree();
-								var oAttr = oNodeLists[n].attributes;	//ATTRIBUTE
+								var oAttr = oNodeLists[n].attributes;	//ATTRIBUTE_NODE
 								for (var a = 0;a < oAttr.length;a++){
 									object[name][n]['@'+oAttr[a].nodeName] = parseText(oAttr[a].nodeValue);
 								}
@@ -199,7 +210,7 @@ JXON.prototype = {
 							n = void(null);
 						}else{
 							object[name] = new JXONTree();
-							var oAttr = oNodes[i].attributes;	//ATTRIBUTE
+							var oAttr = oNodes[i].attributes;	//ATTRIBUTE_NODE
 							for (var a = 0;a < oAttr.length;a++){
 								object[name]['@'+oAttr[a].nodeName] = parseText(oAttr[a].nodeValue);
 							}
@@ -208,8 +219,15 @@ JXON.prototype = {
 						}
 						oNodeLists = void(null);
 						break;
-					case 3 :	//TEXT
+					case 3 :	//TEXT_NODE
+					case 4 :	//CDATA_SECTION_NODE
 						object['#text'] = parseText(value);
+						break;
+					case 7 :	//PROCESSING_INSTRUCTION_NODE
+						object['?'+name] = value;
+						break;
+					case 8 :	//COMMENT_NODE
+						object['#comment'] = value;
 						break;
 					default :
 						break;
@@ -231,12 +249,20 @@ JXON.prototype = {
 		(function(object,oNode){
 			for (var p in object){
 				if (object[p] == null || object[p].constructor != Function){
-					if (/^@xmlns:?([\w]+)?$/.exec(p)){
-					}else if (/^@([\w]+:?[\w]+)$/.exec(p)){
+					if (/^\?([\w\-]+)$/.exec(p)){
+						if ('createProcessingInstruction' in oDocument){
+							oNode.appendChild(oDocument.createProcessingInstruction(RegExp.lastParen , unescapeJS(object[p]).replace(/\?\>/gm,"&#03f;&gt;")));
+						}
+					}else if (/^@xmlns:?([\w\-]+)?$/.exec(p)){
+					}else if (/^@([\w\-]+:?[\w\-]+)$/.exec(p)){
 						oNode.setAttribute(RegExp.lastParen , unescapeJS(object[p]));
-					}else if (/^#text$/.test(p)){
+					}else if (/^#text$/i.test(p)){
 						if (object[p]){
 							oNode.appendChild((hasMarkup(object[p]) && ('createCDATASection' in oDocument && oRoot.tagName == 'div')) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
+						}
+					}else if(/^#comment$/i.test(p)){
+						if ('createComment' in oDocument){
+							oNode.appendChild(oDocument.createComment(unescapeJS(object[p]).replace(/\-\-/gm,"\\-\\-")));
 						}
 					}else {
 						if (object[p] instanceof Array){
