@@ -21,6 +21,8 @@
 		var jxon = new JXON(object);
 	//JXONTreeObject add JXONTreeObject
 		jxon.form.appendBranch({'#text':'test'});
+	//JXONObject validation
+		jxon.validate();
 	//XML or HTML to JXONObject
 		var jxon = new JXON();
 		jxon.build(doc);
@@ -33,41 +35,41 @@
 		var XMLNode = jxon.toDOM(XMLObject);
 		//XMLObject.getElementsByTagName('node')[0].appendChild(XMLNode);
 
-	//JSON not support version only
+	//JSON not support version only(alter. JSON.stringify(jxon); )
 		var JSON = jxon.toJSON();
 */
 
 function JXONTree(object){
-	var mySelfObject = (this instanceof JXONTree) ? this : new JXONTree(object) ;
+	var mySelfObject = (this instanceof JXONTree) ? this : new JXONTree() ;
 	JXON.call(mySelfObject , object);
 	mySelfObject.build = function (){};
+	mySelfObject.validate = function (){};
 	return mySelfObject;
 }
 
 function JXON(object){
 
-	var mySelfObject = (this instanceof JXON) ? this : new JXON(object) ;
+	var mySelfObject = (this instanceof JXON) ? this : new JXON() ;
 
-	var mes = (function(obj,myObject){
+	if ((function(obj,myObject){
 		if (obj instanceof Array){
-			callBackf(''+obj.toString());
-			return 'Object construction error';
+			callBackf("Object construction error\n"+obj.toString());
+			return 1;
 		}else if(obj instanceof Object){
 			for (var p in obj){
 				if (/^(:|\d|.+[@#!?$%\"\'\=\<\>\/\\\s])/.test(p)){
-					callBackf(''+p.toString());
-					return 'invalid property name';
+					callBackf("invalid property name\n"+p.toString());
 				}else if (/^@xmlns:?[\w\-]*$/.test(p)){
 					if (!/^https?:\/\/[\w]+\.[\w\/\.]+/.test(obj[p])){
-						callBackf(''+p+':'+obj[p].toString());
-						return 'invalid property value';
+						callBackf("invalid property value\n"+p+":"+obj[p].toString());
+						myObject[p] = void(obj[p]);
 					}else{
 						myObject[p] = parseText(escapeJS(obj[p]));
 					}
 				}else if (/^(@[\w\-]+:?[\w\-]+|\?([\w\-]+)|#text|#comment)$/i.test(p)){
 					if (obj[p] instanceof Array || obj[p] instanceof Object){
-						callBackf(''+p+':'+obj[p].toString());
-						return 'Object construction error';
+						callBackf("Object construction error\n"+p+":"+obj[p].toString());
+						myObject[p] = void(obj[p]);
 					}else {
 						myObject[p] = parseText(escapeJS(obj[p]));
 					}
@@ -76,14 +78,12 @@ function JXON(object){
 						myObject[p] = [];
 						for (var i = 0;i < obj[p].length;i++){
 							myObject[p][i] = new JXONTree(obj[p][i]);
-							mes = arguments.callee(obj[p][i],myObject[p][i]);
-							if (mes){return mes};
+							arguments.callee(obj[p][i],myObject[p][i]);
 						}
 						i = void(null); 
 					}else if(obj[p] instanceof Object){
 						myObject[p] = new JXONTree(obj[p]);
-						mes = arguments.callee(obj[p],myObject[p]);
-						if (mes){return mes};
+						arguments.callee(obj[p],myObject[p]);
 					}else{
 						myObject[p] = parseText(escapeJS(obj[p]));
 					}
@@ -91,22 +91,32 @@ function JXON(object){
 				p = void(null);
 			}
 		}
-	})(object,mySelfObject);
-	if (mes){
-		e = new Error(mes);
-		e.name = 'JXONError';
-		throw e;
+	})(object,mySelfObject)){
+		return new JXON();
+	}else{
+		return mySelfObject;
 	}
-
-	return mySelfObject;
 }
 
 
+	function warnlog(mes){
+		try {
+			console.warn(mes);
+		}catch (e){
+
+		}
+	}
 	function callBackf(mes){
 		try {
 			console.error(mes);
 		}catch (e){
-			Debug.write(mes);
+			try {
+				Debug.write(mes);
+			}catch (e){
+				var err = new Error(mes);
+				err.name = 'JXONError';
+				throw err;
+			}
 		}
 	}
 	function escapeJS(str){
@@ -147,6 +157,7 @@ function JXON(object){
 JXON.prototype = {
 
 
+
 	toString : function (){
 		if (typeof(this)=='object'){
 			if (this instanceof Array){
@@ -179,6 +190,86 @@ JXON.prototype = {
 	appendBranch : function(object){
 		JXONTree.call(this , object);
 		return this;
+	},
+
+
+
+	validate : function(){
+		if ((function(obj){
+			if (obj instanceof Array){
+				callBackf("Object construction error\n"+obj.toString());
+				return 1;
+			}else if(obj instanceof JXONTree){
+				for (var p in obj){
+					if (/^(:|\d|.+[@#!?$%\"\'\=\<\>\/\\\s])/.test(p)){
+						callBackf("invalid property name\n"+p.toString());
+					}else if (/^@xmlns:?[\w\-]*$/.test(p)){
+						if (!/^https?:\/\/[\w]+\.[\w\/\.]+/.test(obj[p])){
+							callBackf("invalid property value\n"+p+":"+obj[p].toString());
+							obj[p] = void(obj[p]);
+						}
+					}else if (/^(@[\w\-]+:?[\w\-]+|\?([\w\-]+)|#text|#comment)$/i.test(p)){
+						if (obj[p] instanceof Array || ( obj[p] instanceof JXONTree || obj[p] instanceof Object ) ){
+							callBackf("Object construction error\n"+p+":"+obj[p].toString());
+							obj[p] = void(obj[p]);
+						}
+					}else{
+						if (obj[p] instanceof Array){
+							obj[p] = [];
+							for (var i = 0;i < obj[p].length;i++){
+								arguments.callee(obj[p][i]);
+							}
+							i = void(null); 
+						}else if(obj[p] instanceof JXONTree || obj[p] instanceof Object){
+							arguments.callee(obj[p]);
+						}
+					}
+					p = void(null);
+				}
+			}else if(obj instanceof Object){
+				for (var p in obj){
+					warnlog("not initialize object. alternate initialized.\n"+p+":"+obj[p]);
+					if (/^(:|\d|.+[@#!?$%\"\'\=\<\>\/\\\s])/.test(p)){
+						callBackf("invalid property name\n"+p.toString());
+					}else if (/^@xmlns:?[\w\-]*$/.test(p)){
+						if (!/^https?:\/\/[\w]+\.[\w\/\.]+/.test(obj[p])){
+							callBackf("invalid property value\n"+p+":"+obj[p].toString());
+							obj[p] = void(obj[p]);
+						}else{
+							obj[p] = parseText(escapeJS(obj[p]));
+						}
+					}else if (/^(@[\w\-]+:?[\w\-]+|\?([\w\-]+)|#text|#comment)$/i.test(p)){
+						if (obj[p] instanceof Array || obj[p] instanceof Object){
+							callBackf("Object construction error\n"+p+":"+obj[p].toString());
+							obj[p] = void(obj[p]);
+						}else {
+							obj[p] = parseText(escapeJS(obj[p]));
+						}
+					}else{
+						if (obj[p] instanceof Array){
+							obj[p] = [];
+							for (var i = 0;i < obj[p].length;i++){
+								obj[p][i] = new JXONTree(obj[p][i]);
+								arguments.callee(obj[p][i]);
+							}
+							i = void(null); 
+						}else if(obj[p] instanceof Object){
+							obj[p] = new JXONTree(obj[p]);
+							arguments.callee(obj[p]);
+						}else if(obj[p] instanceof JXONTree){
+							arguments.callee(obj[p]);
+						}else{
+							obj[p] = parseText(escapeJS(obj[p]));
+						}
+					}
+					p = void(null);
+				}
+			}
+		})(this)){
+			return false;
+		}else{
+			return true;
+		};
 	},
 
 
