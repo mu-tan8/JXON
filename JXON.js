@@ -44,12 +44,16 @@ function JXONTree(object){
 	JXON.call(mySelfObject , object);
 	mySelfObject.build = function (){};
 	mySelfObject.validate = function (){};
+	delete mySelfObject['$NAMESPACES'];
 	return mySelfObject;
 }
 
 function JXON(object){
 
 	var mySelfObject = (this instanceof JXON) ? this : new JXON() ;
+
+	var NameSpaces = {};
+	NameSpaces['@xmlns'] = null;
 
 	if ((function(obj,myObject){
 		if (obj instanceof Array){
@@ -59,14 +63,17 @@ function JXON(object){
 			for (var p in obj){
 				if (/^(:|\d|.+[@#!?$%\"\'\=\<\>\/\\\s])/.test(p)){
 					callBackf("invalid property name\n"+p.toString());
-				}else if (/^@xmlns:?[\w\-]*$/.test(p)){
+				}else if (/^\$([\w]+)$/.test(p)){
+				}else if (/^@xmlns:?([\w\-]*)$/.test(p)){
+					var key = /^@xmlns:?([\w\-]*)$/.exec(p);
 					if (!/^https?:\/\/[\w]+\.[\w\/\.]+/.test(obj[p])){
 						callBackf("invalid property value\n"+p+":"+obj[p].toString());
 						myObject[p] = void(obj[p]);
 					}else{
 						myObject[p] = parseText(escapeJS(obj[p]));
+						NameSpaces[key[0]] = myObject[p];
 					}
-				}else if (/^(@[\w\-]+:?[\w\-]+|\?([\w\-]+)|#text|#comment)$/i.test(p)){
+				}else if (/^(@[\w\-]+:?[\w\-]*|\?([\w\-]+)|#text|#comment)$/i.test(p)){
 					if (obj[p] instanceof Array || obj[p] instanceof Object){
 						callBackf("Object construction error\n"+p+":"+obj[p].toString());
 						myObject[p] = void(obj[p]);
@@ -80,7 +87,7 @@ function JXON(object){
 							myObject[p][i] = new JXONTree(obj[p][i]);
 							arguments.callee(obj[p][i],myObject[p][i]);
 						}
-						i = void(null); 
+						i = void(null);
 					}else if(obj[p] instanceof Object){
 						myObject[p] = new JXONTree(obj[p]);
 						arguments.callee(obj[p],myObject[p]);
@@ -94,6 +101,8 @@ function JXON(object){
 	})(object,mySelfObject)){
 		return new JXON();
 	}else{
+		mySelfObject['$NAMESPACES'] = NameSpaces;
+		NameSpaces = void(null);
 		return mySelfObject;
 	}
 }
@@ -195,6 +204,8 @@ JXON.prototype = {
 
 
 	validate : function(){
+		var NameSpaces = {};
+		NameSpaces['@xmlns'] = null;
 		if ((function(obj){
 			if (obj instanceof Array){
 				callBackf("Object construction error\n"+obj.toString());
@@ -203,12 +214,19 @@ JXON.prototype = {
 				for (var p in obj){
 					if (/^(:|\d|.+[@#!?$%\"\'\=\<\>\/\\\s])/.test(p)){
 						callBackf("invalid property name\n"+p.toString());
-					}else if (/^@xmlns:?[\w\-]*$/.test(p)){
+					}else if(/^\$([\w]+)$/.test(p)){
+						if (/^\$([\w]+)$/.exec(p)[0] == '$NAMESPACES'){
+							for (var s in obj[p]){
+								NameSpaces[s] = obj[p][s];
+								s = void(null);
+							}
+						}
+					}else if(/^@xmlns:?[\w\-]*$/.test(p)){
 						if (!/^https?:\/\/[\w]+\.[\w\/\.]+/.test(obj[p])){
 							callBackf("invalid property value\n"+p+":"+obj[p].toString());
 							obj[p] = void(obj[p]);
 						}
-					}else if (/^(@[\w\-]+:?[\w\-]+|\?([\w\-]+)|#text|#comment)$/i.test(p)){
+					}else if(/^(@[\w\-]+:?[\w\-]+|\?([\w\-]+)|#text|#comment)$/i.test(p)){
 						if (obj[p] instanceof Array || ( obj[p] instanceof JXONTree || obj[p] instanceof Object ) ){
 							callBackf("Object construction error\n"+p+":"+obj[p].toString());
 							obj[p] = void(obj[p]);
@@ -231,14 +249,23 @@ JXON.prototype = {
 					warnlog("not initialize object. alternate initialized.\n"+p+":"+obj[p]);
 					if (/^(:|\d|.+[@#!?$%\"\'\=\<\>\/\\\s])/.test(p)){
 						callBackf("invalid property name\n"+p.toString());
-					}else if (/^@xmlns:?[\w\-]*$/.test(p)){
+					}else if(/^\$([\w]+)$/.test(p)){
+						if (/^\$([\w]+)$/.exec(p)[0] == '$NAMESPACES'){
+							for (var s in obj[p]){
+								NameSpaces[s] = obj[p][s];
+								s = void(null);
+							}
+						}
+					}else if(/^@xmlns:?([\w\-]*)$/.test(p)){
+						var key = /^@xmlns:?([\w\-]*)$/.exec(p);
 						if (!/^https?:\/\/[\w]+\.[\w\/\.]+/.test(obj[p])){
 							callBackf("invalid property value\n"+p+":"+obj[p].toString());
 							obj[p] = void(obj[p]);
 						}else{
 							obj[p] = parseText(escapeJS(obj[p]));
+							NameSpaces[key[0]] = obj[p];
 						}
-					}else if (/^(@[\w\-]+:?[\w\-]+|\?([\w\-]+)|#text|#comment)$/i.test(p)){
+					}else if (/^(@[\w\-]+:?[\w\-]*|\?([\w\-]+)|#text|#comment)$/i.test(p)){
 						if (obj[p] instanceof Array || obj[p] instanceof Object){
 							callBackf("Object construction error\n"+p+":"+obj[p].toString());
 							obj[p] = void(obj[p]);
@@ -268,6 +295,8 @@ JXON.prototype = {
 		})(this)){
 			return false;
 		}else{
+			obj['$NAMESPACES'] = NameSpaces;
+			NameSpaces = void(null);
 			return true;
 		};
 	},
@@ -278,6 +307,8 @@ JXON.prototype = {
 		if (!oDoc){return false};
 		if (!'childNodes' in oDoc){return false};
 		this.empty();
+		var NameSpaces = {};
+		NameSpaces['@xmlns'] = null;
 		(function(oNode , object){
 			var oNodes = oNode.childNodes;
 			for (var i = 0;i < oNodes.length;i++){
@@ -285,16 +316,27 @@ JXON.prototype = {
 				var value = oNodes[i].nodeValue;
 				switch (oNodes[i].nodeType){
 					case 1 :	//ELEMENT_NODE
+						var prefix = (oNodes[i].prefix) ? '@xmlns:'+oNodes[i].prefix : '@xmlns';
 						var oNodeLists = getNamedChildren(oNode,name);
 						if (oNodeLists.length > 1){
 							object[name] = [];
 							for (var n = 0;n < oNodeLists.length;n++){
 								object[name][n] = new JXONTree();
+								if (oNodeLists[i].namespaceURI && !NameSpaces[prefix]){
+									object[name][n][prefix] = oNodeLists[i].namespaceURI;
+									NameSpaces[prefix] = object[name][n][prefix];
+								}
 								var oAttr = oNodeLists[n].attributes;	//ATTRIBUTE_NODE
 								for (var a = 0;a < oAttr.length;a++){
 									object[name][n]['@'+oAttr[a].nodeName] = parseText(oAttr[a].nodeValue);
+									var prefix = (oAttr[a].prefix) ? '@xmlns:'+oAttr[a].prefix : '@xmlns';
+									if (oAttr[a].namespaceURI && !NameSpaces[prefix]){
+										object[name][n][prefix] = oAttr[a].namespaceURI;
+										NameSpaces[prefix] = object[name][n][prefix];
+									}
+									prefix = void(null);
 								}
-								oAttr = a = void(null);
+								oAttr = prefix = a = void(null);
 								arguments.callee(oNodeLists[n] , object[name][n]);
 								oNode.removeChild(oNodeLists[n]);
 							}
@@ -304,6 +346,12 @@ JXON.prototype = {
 							var oAttr = oNodes[i].attributes;	//ATTRIBUTE_NODE
 							for (var a = 0;a < oAttr.length;a++){
 								object[name]['@'+oAttr[a].nodeName] = parseText(oAttr[a].nodeValue);
+								var prefix = (oAttr[a].prefix) ? '@xmlns:'+oAttr[a].prefix : '@xmlns';
+								if (oAttr[a].namespaceURI && !NameSpaces[prefix]){
+									object[name][prefix] = oAttr[a].namespaceURI;
+									NameSpaces[prefix] = object[name][prefix];
+								}
+								prefix = void(null);
 							}
 							oAttr = a = void(null);
 							arguments.callee(oNodes[i] , object[name]);
@@ -315,7 +363,9 @@ JXON.prototype = {
 						object['#text'] = parseText(value);
 						break;
 					case 7 :	//PROCESSING_INSTRUCTION_NODE
-						object['?'+name] = value;
+						if (name != 'xml'){
+							object['?'+name] = value
+						};
 						break;
 					case 8 :	//COMMENT_NODE
 						object['#comment'] = value;
@@ -327,6 +377,8 @@ JXON.prototype = {
 			}
 			oNodes = i = void(null);
 		})(oDoc,this);
+		this['$NAMESPACES'] = NameSpaces;
+		NameSpaces = void(null);
 		return this;
 	},
 
@@ -337,6 +389,7 @@ JXON.prototype = {
 		if (!'createElement' in oDocument){return false};
 		var oRoot = oDocument.createElement('div');
 		if (!'appendChild' in oRoot){return false};
+		var NameSpaces = this['$NAMESPACES'];
 		(function(object,oNode){
 			for (var p in object){
 				if (object[p] == null || object[p].constructor != Function){
@@ -344,9 +397,16 @@ JXON.prototype = {
 						if ('createProcessingInstruction' in oDocument){
 							oNode.appendChild(oDocument.createProcessingInstruction(RegExp.lastParen , unescapeJS(object[p]).replace(/\?\>/gm,"&#03f;&gt;")));
 						}
-					}else if (/^@xmlns:?([\w\-]+)?$/.exec(p)){
-					}else if (/^@([\w\-]+:?[\w\-]+)$/.exec(p)){
-						oNode.setAttribute(RegExp.lastParen , unescapeJS(object[p]));
+					}else if (/^(@xmlns:?[\w\-]*)|\$([\w]+)?$/.test(p)){
+					}else if (/^@([\w\-]+:?[\w\-]*)$/.test(p)){
+						var key = /^@([\w\-]+):?([\w\-]*)$/.exec(p);
+						var value = unescapeJS(object[p]);
+						if ('setAttributeNS' in oNode && (key[2] && NameSpaces[(key[2]) ? '@xmlns:'+key[1] : '@xmlns'])){
+							oNode.setAttributeNS(NameSpaces[(key[2]) ? '@xmlns:'+key[1] : '@xmlns'] , (key[2]) ? ''+key[1]+':'+key[2] : key[1] , value);
+						}else{
+							oNode.setAttribute(key[1] , value);
+						}
+						key = value = void(null);
 					}else if (/^#text$/i.test(p)){
 						if (object[p]){
 							oNode.appendChild((hasMarkup(object[p]) && ('createCDATASection' in oDocument && oRoot.tagName == 'div')) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
@@ -356,26 +416,31 @@ JXON.prototype = {
 							oNode.appendChild(oDocument.createComment(unescapeJS(object[p]).replace(/\-\-/gm,"\\-\\-")));
 						}
 					}else {
+						var key = /^([\w\-]+):?([\w\-]*)$/.exec(p);
 						if (object[p] instanceof Array){
 							for (var i = 0;i < object[p].length;i++){
-								arguments.callee(object[p][i] , oNode.appendChild(oDocument.createElement(p)));
+								arguments.callee(object[p][i] , oNode.appendChild(('createElementNS' in oDocument && (key[2] && NameSpaces[(key[2]) ? '@xmlns:'+key[1] : '@xmlns'])) ? oDocument.createElementNS(NameSpaces[(key[2]) ? '@xmlns:'+key[1] : '@xmlns'] , p) : oDocument.createElement(p)));
 							}
 							i = void(null);
-						}else if(object[p] instanceof JXONTree){
-							arguments.callee(object[p] , oNode.appendChild(oDocument.createElement(p)));
 						}else{
-							if(parseText(object[p]) != null){
-								oNode.appendChild(oDocument.createElement(p)).appendChild((hasMarkup(object[p]) &&('createCDATASection' in oDocument && oRoot.tagName == 'div')) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
+							var oElement = ('createElementNS' in oDocument && (key[2] && NameSpaces[(key[2]) ? '@xmlns:'+key[1] : '@xmlns'])) ? oDocument.createElementNS(NameSpaces[(key[2]) ? '@xmlns:'+key[1] : '@xmlns'] , p) : oDocument.createElement(p) ;
+							if (object[p] instanceof JXONTree){
+								arguments.callee(object[p] , oNode.appendChild(oElement));
 							}else{
-								oNode.appendChild(oDocument.createElement(p));
+								if(parseText(object[p]) != null){
+									oNode.appendChild(oElement).appendChild((hasMarkup(object[p]) &&('createCDATASection' in oDocument && oRoot.tagName == 'div')) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
+								}else{
+									oNode.appendChild(oElement);
+								}
 							}
+							oElement = void(null);
 						}
 					}
 				}
 				p = void(null);
 			}
 		})(this,oRoot);
-		oDocument = void(null);
+		NameSpaces = oDocument = void(null);
 		return (oRoot.childNodes.length > 1) ? oRoot.childNodes : oRoot.lastChild ;
 	},
 
