@@ -396,8 +396,9 @@ JXON.prototype = {
 	toDOM : function(oDocument){
 		var oDocument = oDocument || document;
 		if (!'createElement' in oDocument){return false};
-		var oRoot = oDocument.createElement('div');
-		if (!'appendChild' in oRoot){return false};
+		var oDiv = oDocument.createElement('div');
+		if (!'appendChild' in oDiv){return false};
+		var oRoot = ('createDocumentFragment' in oDocument) ? oDocument.createDocumentFragment() : oDiv ;
 		var NameSpaces = this['$NAMESPACES'];
 		(function(object,oNode){
 			for (var p in object){
@@ -419,7 +420,7 @@ JXON.prototype = {
 						key = prefix = value = void(null);
 					}else if (/^#text$/i.test(p)){
 						if (object[p]){
-							oNode.appendChild((hasMarkup(object[p]) && ('createCDATASection' in oDocument && oRoot.tagName == 'div')) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
+							oNode.appendChild((hasMarkup(object[p]) && ('createCDATASection' in oDocument && oDiv.tagName == 'div')) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
 						}
 					}else if(/^#comment$/i.test(p)){
 						if ('createComment' in oDocument){
@@ -439,7 +440,7 @@ JXON.prototype = {
 								arguments.callee(object[p] , oNode.appendChild(oElement));
 							}else{
 								if(parseText(object[p]) != null){
-									oNode.appendChild(oElement).appendChild((hasMarkup(object[p]) &&('createCDATASection' in oDocument && oRoot.tagName == 'div')) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
+									oNode.appendChild(oElement).appendChild((hasMarkup(object[p]) &&('createCDATASection' in oDocument && oDiv.tagName == 'div')) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
 								}else{
 									oNode.appendChild(oElement);
 								}
@@ -453,7 +454,7 @@ JXON.prototype = {
 			}
 		})(this,oRoot);
 		NameSpaces = oDocument = void(null);
-		return (oRoot.childNodes.length > 1) ? oRoot.childNodes : oRoot.lastChild ;
+		return (oRoot.nodeType == 11) ? oRoot : oRoot.childNodes ;
 	},
 
 
@@ -464,13 +465,13 @@ JXON.prototype = {
 		var oRoot = oDocument.createElement('div');
 		if (!'appendChild' in oRoot){return false};
 		var oNodes = this.toDOM(oDocument);
-		if (oNodes.parentNode){
-			oRoot.appendChild(oNodes);
-		}else if(oNodes.length){
+		if (oNodes.length){
 			for (var i = 0;i < oNodes.length;i++){
 				oRoot.appendChild(oNodes[i]);
 			}
 			i = void(null);
+		}else{
+			oRoot.appendChild(oNodes);
 		}
 		oNodes = oDocument = void(null);
 		return oRoot.innerHTML;
