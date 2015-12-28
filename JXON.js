@@ -102,7 +102,7 @@ function JXON(object){
 	})(object,mySelfObject)){
 		return new JXON();
 	}else{
-		mySelfObject['$NAMESPACES'] = NameSpaces;
+		JXON.prototype['$NAMESPACES'] = NameSpaces;
 		NameSpaces = void(null);
 		return mySelfObject;
 	}
@@ -299,7 +299,7 @@ JXON.prototype = {
 		})(this)){
 			return false;
 		}else{
-			obj['$NAMESPACES'] = NameSpaces;
+			this.constructor.prototype['$NAMESPACES'] = NameSpaces;
 			NameSpaces = void(null);
 			return true;
 		};
@@ -386,7 +386,7 @@ JXON.prototype = {
 			}
 			oNodes = i = void(null);
 		})(oDoc,this);
-		this['$NAMESPACES'] = NameSpaces;
+		this.constructor.prototype['$NAMESPACES'] = NameSpaces;
 		NameSpaces = void(null);
 		return this;
 	},
@@ -399,7 +399,7 @@ JXON.prototype = {
 		var oDiv = oDocument.createElement('div');
 		if (!'appendChild' in oDiv){return false};
 		var oRoot = ('createDocumentFragment' in oDocument) ? oDocument.createDocumentFragment() : oDiv ;
-		var NameSpaces = this['$NAMESPACES'];
+		var NameSpaces = this.constructor.prototype['$NAMESPACES'];
 		(function(object,oNode){
 			for (var p in object){
 				if (object[p] == null || object[p].constructor != Function){
