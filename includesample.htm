@@ -1,10 +1,12 @@
 ﻿<script src="JXON.js"></script>
 <script>//<!--
 /*	oXML = new ActiveXObject('Microsoft.XMLDOM');
-	oXML.load('test.xml');
+	oXML.load('JXON.xsl');
 	document.writeln(
-*/	var jxon = new JXON({'form':{'@method':'post','@action':'.','input':[{'@name':'uname'},{'@name':'upw','@type':'password'},{'@type':'submit','@value':'login'}]}});
+*/	var jxon = new JXON({'body':{'form':{'@method':'post','@action':'.','input':[{'@name':'uname'},{'@name':'upw','@type':'password'},{'@type':'submit','@value':'login'}]}}});
 	jxon.build(document);
-	alert(jxon.toDOMString());
+	jxon.HTML.appendBranch({'body':{'p':{'#text':jxon.HTML.toDOMString()}}});
+	jxon.HTML.HEAD = new JXONTree({'#comment':(jxon.HTML.HEAD.toDOMString())});
+	document.writeln(jxon.toDOMString());
 //	alert(new JXON().build(oXML).toDOM(oXML).xml);
 //--></script>
