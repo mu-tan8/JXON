@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>JXON 2.0 Demo / Example (JXON Converter)</title>
+<script src="JXON.js">//</script>
+<style>/*<!--*/
+html , body {
+	width:99%;
+	height:99%;
+}
+#content {
+	display:flex;
+	width: 99%;
+	height:20%;
+	margin:auto;
+}
+#content > div{
+	width: 33%;
+	height:99%;
+}
+#content > div > div {
+	width: 98%;
+	height: 98%;
+	min-width:320px;
+	min-height:200px;
+	border:thin solid gray;
+	overflow:auto;
+}
+textarea[name="input"] , #oCode {
+	width: 98%;
+	height: 88%;
+	min-width:320px;
+	min-height:200px;
+	white-space:pre;
+	overflow-x:auto;
+	font-size: 16pt;
+}
+input[type="checkbox"] {
+	display:none;
+}
+input[type="checkbox"] + label {
+	padding:0 5px;
+	margin:0 0;
+	color:black;
+	background-color:silver;
+	border:3px outset gray;
+}
+input[type="checkbox"]:checked + label {
+	color:white;
+	background-color:blue;
+	border:3px inset black;
+}
+#output {
+	display:flex;
+	width:99%;
+	height:20%;
+	margin: auto;
+}
+#output > div {
+	width:33%;
+	height: 99%;
+	min-width: 320px;
+	min-height:200px;
+	border:3px groove black;
+}
+#output div textarea{
+	width:98%;
+	height:88%;
+	margin:auto;
+	overflow-x: auto;
+	border:thin solid gray;
+	font-size: 16pt;
+}
+
+/*-->*/</style>
+</head>
+<body>
+<h1>JXON 2.0 Demo / Example (JXON Converter)</h1>
+<form>
+<div onselectstart="event.preventDefault();">
+<span>input:</span>
+<input type="radio" name="type" value="JSON" id="JSON" checked><label for="JSON">JSON</label><input type="radio" name="type" value="XML" id="XML"><label for="XML">XML</label><input type="radio" name="type" value="HTML" id="HTML"><label for="HTML">HTML</label>
+<button type="button" onclick="location.reload(true);">Reload</button>
+<button type="button" onclick="clr(event)">CLS</button>
+</div>
+<div id="content">
+<div>
+data:
+<textarea name="input" spellcheck="false" autocomplete="off" autofocus ondragover="event.preventDefault();" ondrop="(async(e)=>{e.preventDefault();let oFile = e.dataTransfer.files[0];load(await oFile.text(),['json','xml','html'].find((f)=>oFile.type.includes(f)) || 'json');})(event)">[{"!doctype":{"publicID":"","systemID":""}},{"?xml-stylesheet":"href=\"#\" type=\"text/xsl\" "},{"#comment":" comment "},{"xsl:stylesheet":[{"#text":"\n"},{"xsl:output":{"@method":"xml"}},{"#text":"\n"},{"xsl:template":[{"#text":"\n"},{"html":[{"#text":"\n"},{"head":[{"#text":"\n"},{"title":[{"#text":"example"}]},{"#text":"\n"}]},{"#text":"\n"},{"body":[{"#text":"\n"},{"script":[{"#cdata-section":"//<!--\nalert(\"\");\n//-->"}]},{"#text":"\n"},{"#comment":"\ncomment\n"},{"#text":"\n"}]},{"#text":"\n"}],"@xmlns":"http://www.w3.org/1999/xhtml","@lang":"ja"},{"#text":"\n"}],"@match":"/"},{"#text":"\n"}],"@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@version":"1.0","@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@xmlns":"http://www.w3.org/1999/xhtml"}]</textarea>
+</div>
+<div>
+code:
+<textarea id="oCode" readOnly>
+let j = new JXON(), parser = (o,t)=>{
+	let ret = o;
+	switch(t){
+		case 'JSON':
+			ret = JSON.parse(ret);
+			break;
+		case 'XML' :
+			ret = new DOMParser().parseFromString(ret,'text/xml');
+			break;
+		case 'HTML' :
+			ret = new DOMParser().parseFromString(ret,'text/html');
+			break;
+		default:
+			alert(t);
+			break;
+	}
+	return ret;
+};
+let lst = [...$output].filter((c)=>c.checked).map((c)=>c.value);
+j.ondone = (e)=>{console.log('[done]:',e.detail.result)};
+j.onfail = (e)=>{console.log('[fail]:',e.detail.message)};
+j.build(parser($input.value,$type.value))
+.then((w)=>Promise.all([
+	(lst.includes('JXON')) ? w.stringify().then((x)=>$oJXON.value = x) : Promise.resolve() ,
+	(lst.includes('XML')) ? w.unbuild().then((x)=>$oXML.value = '<?xml version="1.0"?>\n'+new XMLSerializer().serializeToString(x)) : Promise.resolve() ,
+	(lst.includes('HTML')) ? w.unbuild(true).then((x)=>$oHTML.value = '<!DOCTYPE '+x.documentElement.tagName.toLowerCase()+'>\n'+x.documentElement.outerHTML) : Promise.resolve()
+]))
+.finally((w)=>{
+	j = void(0);
+	console.log('fin.');
+});</textarea>
+</div>
+<div>
+console:
+<div id="oConsole"></div>
+</div>
+</div>
+<div onselectstart="event.preventDefault();">
+<span>output:</span>
+<input type="checkbox" name="output[]" value="JXON" id="output-JXON"><label for="output-JXON">JXON</label><input type="checkbox" name="output[]" value="XML" id="output-XML" checked><label for="output-XML">XML</label><input type="checkbox" name="output[]" value="HTML" id="output-HTML" checked><label for="output-HTML">HTML</label>
+<button type="button" onclick="exec(event)">Exec</button>
+</div>
+</form>
+<div id="output">
+<div>
+JXON:
+<button type="button" onclick="load(document.getElementById('oJXON').value,'json')">Load</button>
+<button type="button" onclick="save(document.getElementById('oJXON').value,'json',prompt('','untitled.json'))">Save</button>
+<textarea id="oJXON" readOnly></textarea>
+</div>
+<div>
+XML:
+<button type="button" onclick="load(document.getElementById('oXML').value,'xml')">Load</button>
+<button type="button" onclick="save(document.getElementById('oXML').value,'xml',prompt('','untitled.xml'))">Save</button>
+<textarea id="oXML" readOnly></textarea>
+</div>
+<div>
+HTML:
+<button type="button" onclick="load(document.getElementById('oHTML').value,'html')">Load</button>
+<button type="button" onclick="save(document.getElementById('oHTML').value,'html',prompt('','untitled.html'))">Save</button>
+<textarea id="oHTML" readOnly></textarea>
+</div>
+</div>
+<script>//<!--
+function exec(e){
+	document.getElementById('oConsole').innerHTML = '';
+	['oJXON','oXML','oHTML'].forEach((x)=>{
+		document.getElementById(x).value = '';
+	});
+	try {
+		(new Function(
+			'console','$input','$output','$type','$oJXON','$oXML','$oHTML','try{'+document.getElementById('oCode').value+'}catch(e){console.log(e);};'
+		))(
+			{
+				log:(...arg)=>{
+					let oPre = document.getElementById('oConsole').appendChild(document.createElement('pre'));
+					oPre.textContent = [...arg].join('\t');
+					console.log(...arg);
+				}
+			},
+			e.target.form.elements['input'],
+			e.target.form.elements['output[]'],
+			e.target.form.elements['type'],
+			document.getElementById('oJXON'),
+			document.getElementById('oXML'),
+			document.getElementById('oHTML')
+		);
+	}catch(err){
+		console.error(err);
+	}
+}
+function save(cont,ext,name){
+	if (name === null) return void(false);
+	((o)=>{
+		[
+			['href',window.URL.createObjectURL(new Blob([cont],{type:{json:'text/plain',xml:'text/xml',html:'text/html'}[ext]}))],
+			['download',name || 'untitled.'+ext]
+		].forEach(([k,v])=>{o[k] = v});
+		return o;
+	})(document.createElement('a')).click();
+}
+function load(cont,type){
+	document.forms[0].input.value = cont;
+	[...document.forms[0].type].find((e)=>e.value == type.toUpperCase()).checked = true;
+}
+function clr(e){
+	e.target.form.reset();
+	e.target.form.input.value = '';
+}
+//--></script>
+</body>
+</html>

@@ -1,526 +1,609 @@
-﻿/*
-
-	JXON [Javascript XML Object Notation] library
-
-	MDN JXON https://developer.mozilla.org/en-US/docs/JXON
-
-	This is unofficial library.
-
-	Distribute & Documents  https://github.com/mu-tan8/JXON
-
-	MIT Lisence Copyright (c) 2015 mu-tan8(theta)
-
-*/
-
-
-/*
-	How To Use
-
-	//Object to JXONObject
-		var object = {'form':{'@method':'post','@action':'.','input':[{'@name':'uname'},{'@name':'upw','@type':'password'},{'@type':'submit','@value':'login'}]}};
-		var jxon = new JXON(object);
-	//JXONTreeObject add JXONTreeObject
-		jxon.form.appendBranch({'#text':'test'});
-	//JXONObject validation
-		jxon.validate();
-	//XML or HTML to JXONObject
-		var jxon = new JXON();
-		jxon.build(doc);
-	//JXONObject to HTML on browser
-		var HTMLNode = jxon.toDOM();
-		//document.body.appendChild(HTMLNode);
-	//get HTML Strings value option (near eq. jxon.toDOM().innerHTML;)
-		var HTMLStrings = jxon.toDOMString();
-	//JXONObject to XML
-		var XMLNode = jxon.toDOM(XMLObject);
-		//XMLObject.getElementsByTagName('node')[0].appendChild(XMLNode);
-
-	//JSON not support version only(alter. JSON.stringify(jxon); )
-		var JSON = jxon.toJSON();
-*/
-
-function JXONTree(object){
-	var mySelfObject = (this instanceof JXONTree) ? this : new JXONTree() ;
-	JXON.call(mySelfObject , object);
-	mySelfObject.build = function (){};
-	mySelfObject.validate = function (){};
-	delete mySelfObject['$NAMESPACES'];
-	return mySelfObject;
-}
-
-function JXON(object){
-
-	var mySelfObject = (this instanceof JXON) ? this : new JXON() ;
-
-	var NameSpaces = {};
-	NameSpaces['@xmlns'] = null;
-
-	if ((function(obj,myObject){
-		if (obj instanceof Array){
-			callBackf("Object construction error\n"+obj.toString());
-			return 1;
-		}else if(obj instanceof Object){
-			for (var p in obj){
-				if (/^(:|\d|.+[@#!?$%\"\'\=\<\>\/\\\s])/.test(p)){
-					callBackf("invalid property name\n"+p.toString());
-				}else if (/^\?xml$/i.test(p)){
-					callBackf("invalid property name\n"+p.toString());
-				}else if (/^\$([\w]+)$/.test(p)){
-				}else if (/^@xmlns:?([\w\-]*)$/.test(p)){
-					if (!/^https?:\/\/[\w]+\.[\w\/\.]+/.test(obj[p])){
-						callBackf("invalid property value\n"+p+":"+obj[p].toString());
-						myObject[p] = void(obj[p]);
-					}else{
-						myObject[p] = parseText(escapeJS(obj[p]));
-						NameSpaces[/^@xmlns:?([\w\-]*)$/.exec(p)[0]] = myObject[p];
+//{
+	class JXONTree extends EventTarget {
+		constructor(){
+			super();
+			if (!(this instanceof JXON)){
+				throw new Error();
+			}
+			Object.defineProperties(this,{
+				_parent:{
+					get (){
+						return null;
 					}
-				}else if (/^(@[\w\-]+:?[\w\-]*|\?([\w\-]+)|#text|#comment)$/i.test(p)){
-					if (obj[p] instanceof Array || obj[p] instanceof Object){
-						callBackf("Object construction error\n"+p+":"+obj[p].toString());
-						myObject[p] = void(obj[p]);
-					}else {
-						myObject[p] = parseText(escapeJS(obj[p]));
+				},
+				_owner:{
+					get (){
+						return null;
 					}
+				}
+			});
+		}
+		#_ = Object.create(JXONTree.prototype);
+		#_ondone = null;
+		get ondone(){
+			return (this.constructor.name == 'JXON') ? this.#_ondone : this._owner.#_ondone ;
+		}
+		set ondone(p){
+			if (p === null || p.constructor.name.toLowerCase() === 'function'){
+				if (this.constructor.name == 'JXON'){
+					if (p !== this.#_ondone) this.removeEventListener('done',this.#_ondone);
+					if (p) this.addEventListener('done',p);
+					this.#_ondone = p;
 				}else{
-					if (obj[p] instanceof Array){
-						myObject[p] = [];
-						for (var i = 0;i < obj[p].length;i++){
-							myObject[p][i] = new JXONTree(obj[p][i]);
-							arguments.callee(obj[p][i],myObject[p][i]);
-						}
-						i = void(null);
-					}else if(obj[p] instanceof Object){
-						myObject[p] = new JXONTree(obj[p]);
-						arguments.callee(obj[p],myObject[p]);
-					}else{
-						myObject[p] = parseText(escapeJS(obj[p]));
-					}
-				}
-				p = void(null);
-			}
-		}
-	})(object,mySelfObject)){
-		return new JXON();
-	}else{
-		JXON.prototype['$NAMESPACES'] = NameSpaces;
-		NameSpaces = void(null);
-		return mySelfObject;
-	}
-}
-
-
-	function warnlog(mes){
-		try {
-			console.warn(mes);
-		}catch (e){
-
-		}
-	}
-	function callBackf(mes){
-		try {
-			console.error(mes);
-		}catch (e){
-			try {
-				Debug.write(mes);
-			}catch (e){
-				var err = new Error(mes);
-				err.name = 'JXONError';
-				throw err;
-			}
-		}
-	}
-	function escapeJS(str){
-		return String(str).replace(/\\/gm,"\\\\").replace(/\"|\&quot\;/gm,"\\\"").replace(/\n|\&#010\;/gm,"\\n");
-	}
-	function unescapeJS(str){
-		return String(str).replace(/\\n/g,"\n").replace(/\\"/g,"\"").replace(/\\/g,"\\");
-	}
-	function hasMarkup(str){
-		return (/[\<\>]|\&lt\;|\&gt\;/m.test(str) && !/\]\](\>|\&gt\;)/m.test(str));
-	}
-	function parseText(value){
-		if (/^\s*$|^\s*null\s*$/i.test(value)){
-			return null;
-		}else if(/^(true|false)$/i.test(value)){
-			return (String(value).toLowerCase() === "true");
-		}else if (isFinite(value)){
-			return parseFloat(value);
-		}else{
-			return value;
-		}
-	}
-	var getNamedChildren = function (oNode,name){
-		var oNodes = oNode.childNodes;
-		var n = 0 , Nodes = [];
-		for (var i = 0;i < oNodes.length;i++){
-			if (oNodes[i].nodeName == name){
-				Nodes[n] = oNodes[i];
-				n++;
-			}
-		}
-		oNodes = i = n = void(null);
-		return Nodes;
-	}
-
-
-
-JXON.prototype = {
-
-
-
-	toString : function (){
-		if (typeof(this)=='object'){
-			if (this instanceof Array){
-				return '[object Array]';
-			}else if(this instanceof JXON){
-				return '[object JXONObject]';
-			}else if(this == null){
-				return String(null);
-			}else{
-				return String(this);
-			}
-		}else{
-			return String(parseText(this));
-		}
-	},
-
-
-
-	empty : function(){
-		for (var p in this){
-			if (this[p] == null || this[p].constructor != Function){
-				delete this[p];
-			}
-			p = void(null);
-		}
-	},
-
-
-
-	appendBranch : function(object){
-		JXONTree.call(this , object);
-		return this;
-	},
-
-
-
-	validate : function(){
-		var NameSpaces = {};
-		NameSpaces['@xmlns'] = null;
-		if ((function(obj){
-			if (obj instanceof Array){
-				callBackf("Object construction error\n"+obj.toString());
-				return 1;
-			}else if(obj instanceof JXONTree){
-				for (var p in obj){
-					if (/^(:|\d|.+[@#!?$%\"\'\=\<\>\/\\\s])/.test(p)){
-						callBackf("invalid property name\n"+p.toString());
-					}else if(/^\?xml$/i.test(p)){
-						callBackf("invalid property name\n"+p.toString());
-					}else if(/^\$([\w]+)$/.test(p)){
-						if (/^\$([\w]+)$/.exec(p)[0] == '$NAMESPACES'){
-							for (var s in obj[p]){
-								NameSpaces[s] = obj[p][s];
-								s = void(null);
-							}
-						}
-					}else if(/^@xmlns:?[\w\-]*$/.test(p)){
-						if (!/^https?:\/\/[\w]+\.[\w\/\.]+/.test(obj[p])){
-							callBackf("invalid property value\n"+p+":"+obj[p].toString());
-							obj[p] = void(obj[p]);
-						}
-					}else if(/^(@[\w\-]+:?[\w\-]+|\?([\w\-]+)|#text|#comment)$/i.test(p)){
-						if (obj[p] instanceof Array || ( obj[p] instanceof JXONTree || obj[p] instanceof Object ) ){
-							callBackf("Object construction error\n"+p+":"+obj[p].toString());
-							obj[p] = void(obj[p]);
-						}
-					}else{
-						if (obj[p] instanceof Array){
-							obj[p] = [];
-							for (var i = 0;i < obj[p].length;i++){
-								arguments.callee(obj[p][i]);
-							}
-							i = void(null); 
-						}else if(obj[p] instanceof JXONTree || obj[p] instanceof Object){
-							arguments.callee(obj[p]);
-						}
-					}
-					p = void(null);
-				}
-			}else if(obj instanceof Object){
-				for (var p in obj){
-					warnlog("not initialize object. alternate initialized.\n"+p+":"+obj[p]);
-					if (/^(:|\d|.+[@#!?$%\"\'\=\<\>\/\\\s])/.test(p)){
-						callBackf("invalid property name\n"+p.toString());
-					}else if(/^\?xml$/i.test(p)){
-						callBackf("invalid property name\n"+p.toString());
-					}else if(/^\$([\w]+)$/.test(p)){
-						if (/^\$([\w]+)$/.exec(p)[0] == '$NAMESPACES'){
-							for (var s in obj[p]){
-								NameSpaces[s] = obj[p][s];
-								s = void(null);
-							}
-						}
-					}else if(/^@xmlns:?([\w\-]*)$/.test(p)){
-						if (!/^https?:\/\/[\w]+\.[\w\/\.]+/.test(obj[p])){
-							callBackf("invalid property value\n"+p+":"+obj[p].toString());
-							obj[p] = void(obj[p]);
-						}else{
-							obj[p] = parseText(escapeJS(obj[p]));
-							NameSpaces[/^@xmlns:?([\w\-]*)$/.exec(p)[0]] = obj[p];
-						}
-					}else if (/^(@[\w\-]+:?[\w\-]*|\?([\w\-]+)|#text|#comment)$/i.test(p)){
-						if (obj[p] instanceof Array || obj[p] instanceof Object){
-							callBackf("Object construction error\n"+p+":"+obj[p].toString());
-							obj[p] = void(obj[p]);
-						}else {
-							obj[p] = parseText(escapeJS(obj[p]));
-						}
-					}else{
-						if (obj[p] instanceof Array){
-							obj[p] = [];
-							for (var i = 0;i < obj[p].length;i++){
-								obj[p][i] = new JXONTree(obj[p][i]);
-								arguments.callee(obj[p][i]);
-							}
-							i = void(null); 
-						}else if(obj[p] instanceof Object){
-							obj[p] = new JXONTree(obj[p]);
-							arguments.callee(obj[p]);
-						}else if(obj[p] instanceof JXONTree){
-							arguments.callee(obj[p]);
-						}else{
-							obj[p] = parseText(escapeJS(obj[p]));
-						}
-					}
-					p = void(null);
+					if (p !== this._owner.#_ondone) this._owner.removeEventListener('done',this._owner.#_ondone);
+					if (p) this._owner.addEventListener('done',p);
+					this._owner.#_ondone = p;
 				}
 			}
-		})(this)){
-			return false;
-		}else{
-			this.constructor.prototype['$NAMESPACES'] = NameSpaces;
-			NameSpaces = void(null);
-			return true;
-		};
-	},
-
-
-
-	build : function(oDoc){
-		if (!oDoc){return false};
-		if (!'childNodes' in oDoc){return false};
-		this.empty();
-		var NameSpaces = {};
-		NameSpaces['@xmlns'] = null;
-		(function(oNode , object){
-			var oNodes = oNode.childNodes;
-			for (var i = 0;i < oNodes.length;i++){
-				var name = oNodes[i].nodeName;
-				var value = oNodes[i].nodeValue;
-				switch (oNodes[i].nodeType){
-					case 1 :	//ELEMENT_NODE
-						var oNodeLists = getNamedChildren(oNode,name);
-						if (oNodeLists.length > 1){
-							object[name] = [];
-							for (var n = 0;n < oNodeLists.length;n++){
-								object[name][n] = new JXONTree();
-								var pref = (oNodeLists[n].prefix) ? '@xmlns:'+oNodeLists[n].prefix : '@xmlns' ;
-								if (oNodeLists[n].namespaceURI && !NameSpaces[pref]){
-									object[name][n][pref] = oNodeLists[n].namespaceURI;
-									NameSpaces[pref] = object[name][n][pref];
+		}
+		#_onfail = null;
+		get onfail(){
+			return (this.constructor.name == 'JXON') ? this.#_onfail : this._owner.#_onfail ;
+		}
+		set onfail(p){
+			if (p === null || p.constructor.name.toLowerCase() === 'function'){
+				if (this.constructor.name == 'JXON'){
+					if (p !== this.#_onfail) this.removeEventListener('fail',this.#_onfail);
+					if (p) this.addEventListener('fail',p);
+					this.#_onfail = p;
+				}else{
+					if (p !== this._owner.#_onfail) this._owner.removeEventListener('fail',this._owner.#_onfail);
+					if (p) this._owner.addEventListener('fail',p);
+					this._owner.#_onfail = p;
+				}
+			}
+		}
+		#_exlock = Object.create(null);
+		stringify(){
+			const sanitize = (v)=>{
+					return (typeof v == 'string' 
+						? '"'+([
+								['\\','\\\\'],
+								['"','\\"'],
+								['\t','\\t'],
+								['\n','\\n'],
+								['\r','\\r'],
+								['\f','\\f'],
+								['\b','\\b']
+							].reduce((c,[b,a])=>c = c.replaceAll(b,a),v)
+							)+'"' 
+						: (
+							(typeof v == 'object' && Object.values(v).length === 0) ||
+							(v === null || typeof v == 'undefined') 
+								? null 
+								: v 
+							)) ; 
+				} ,
+				frag = (w)=>(w.every(([k,v])=>isNaN(k))) 
+					? '{'+w.map(([k,v])=>`"${k}":${v}`).join(',')+'}' 
+					: [
+						'['+w.filter(([k,v])=>!isNaN(k)).map(([k,v])=>v).join(',')+']',
+						w.filter(([k,v])=>isNaN(k)).map(([k,v])=>`"${k}":${v}`).join(',')
+					].filter((c)=>c).join(',') ,
+				rec = (o)=>{
+					return Promise.all(Object.entries(o).filter(([k,v])=>!(['length','_parent','_owner'].includes(k))).map(([k,v])=>{
+						let id , p = new Promise((r,f)=>{
+							id = setTimeout(async()=>{
+								try {
+									r([
+										k,(typeof v == 'object' && Object.keys(v).length) 
+											? await rec(v)
+												.then((w)=>frag(w))
+											: sanitize(v)
+									]);
+								}catch(e){
+									f(e);
 								}
-								var oAttr = oNodeLists[n].attributes;	//ATTRIBUTE_NODE
-								for (var a = 0;a < oAttr.length;a++){
-									object[name][n]['@'+oAttr[a].nodeName] = parseText(oAttr[a].nodeValue);
-									var pref = (oAttr[a].prefix) ? '@xmlns:'+oAttr[a].prefix : '@xmlns';
-									if (oAttr[a].namespaceURI && !NameSpaces[pref]){
-										object[name][n][pref] = oAttr[a].namespaceURI;
-										NameSpaces[pref] = object[name][n][pref];
+							});
+						});
+						p.id = id;
+						return p;
+					})).then((w)=>w.map((e)=>{
+						if (e) clearTimeout(e.id);
+						return e;
+					}));
+				}
+			return rec(this)
+				.then((w)=>frag(w))
+				.then((w)=>{
+					this.dispatchEvent(new CustomEvent('done',{
+						detail:{
+							result:w ,
+							resultType:1
+						}
+					}));
+					return w;
+				})
+				.catch((w)=>{
+					this.dispatchEvent(new CustomEvent('fail',{
+						detail:{
+							message:w
+						}
+					}));
+					return w;
+				});
+		}
+		branch (obj){
+			const [LOCK,DATA] = [{configurable:true} , {enumerable:true}] ,
+				rec = (o)=>{
+					return Promise.all(Object.entries(o).map(([k,v])=>{
+						let id , p = new Promise((r,f)=>{
+							id = setTimeout(async()=>{
+								try {
+									if (isNaN(k)){
+										if (k.startsWith('@')){
+											r([k,{value:(typeof v == 'object') ? Object.create(JXONTree.prototype) : v,...DATA}]);
+										}else{
+											r(void(0));
+										}
+									}else{
+										let blockNodes = (typeof v == 'object' && v) ? await Promise.all(Object.entries(v).map(([n,e])=>{
+											let id2 , p2 = new Promise((r2,f2)=>{
+												id2 = setTimeout(async()=>{
+													try {
+														if (n.startsWith('#')){
+															r2([n,{value:(typeof e == 'object') ? Object.create(JXONTree.prototype) : e,...DATA}]);
+														}else if (n.startsWith('?')){
+															r2([n,{value:(typeof e == 'object') ? Object.create(JXONTree.prototype) : e,...DATA}]);
+														}else if (n.startsWith('@xmlns')){
+															r2([n,{value:(typeof e == 'object') ? Object.create(JXONTree.prototype) : e,...DATA}]);
+														}/*else if (/^\W/.test(n)){
+															r2(void(0));
+														}*/else if (/^\w+/.test(n)){
+															let res = (e) ? await rec(e) : [] ;
+															r2([n,{
+																value:(typeof e == 'object' && e && Object.keys(e).length) 
+																	? Object.create(JXONTree.prototype,Object.fromEntries(res.concat([
+																		['length',{value:Object.values(res).filter((c)=>!isNaN(c[0])).length,writable:true}] ,
+																		['_owner',{get (){return owner;}}] ,
+																		...Object.entries(v).filter(([a,x])=>a.startsWith('@')).map(([a,x])=>[a,{value:x,...DATA}])
+																	]).filter((c)=>c))) 
+																	: e || Object.create(JXONTree.prototype,{'_owner':{get (){return owner;}}}),...DATA
+																}
+															]);
+														}else{
+															r2(void(0));
+														}
+													}catch(e){
+														f2(e);
+													}
+												});
+											});
+											p2.id = id2;
+											return p2;
+										})).then((w)=>w.map((e)=>{
+											if (e) clearTimeout(e.id);
+											return e;
+										})) : [] ;
+										blockNodes = Object.create(JXONTree.prototype,Object.fromEntries(blockNodes.filter((c)=>c)));
+										Object.values(blockNodes).forEach((v)=>{
+											if (typeof v == 'object' && v){
+												Object.values(v).forEach((e)=>{
+													if (typeof e == 'object' && e){
+														Object.defineProperties(e,{
+															'_owner':{
+																get (){
+																	return owner;
+																}
+															},
+															'_parent':{
+																get (){
+																	return blockNodes;
+																}
+															}
+														});
+														Object.preventExtensions(e);
+													}
+												});
+												Object.preventExtensions(v);
+											}
+										});
+										r([k,{value:blockNodes,...DATA}]);
 									}
-									pref = void(null);
+								}catch(e){
+									f(e);
 								}
-								oAttr = pref = a = void(null);
-								arguments.callee(oNodeLists[n] , object[name][n]);
-								oNode.removeChild(oNodeLists[n]);
+							});
+						});
+						p.id = id;
+						return p;
+					})).then((w)=>w.map((e)=>{
+						if (e) clearTimeout(e.id);
+						return e;
+					}));
+				} , 
+				owner = this ,
+				[targ,lock] = [Object.keys(this)[0] || 'this object',Object.create(null)];
+			if (this.constructor.name == 'JXON'){
+				if (targ in this.#_exlock){
+					return Promise.reject(''+targ+' is locked.');
+				}
+				this.#_exlock = Object.create(null,{[targ]:{value:lock,...LOCK}});
+				return Promise.resolve(obj)
+					.then(async(w)=>{
+						const root = Object.create(JXONTree.prototype,{'length':{value:0,writable:true}});
+						let names = Object.values(w) ,
+							values = w ,
+							sIdx = names.findIndex((v)=>Object.entries(v).find(([n,e])=>
+								n == '!doctype' && 
+								(Object.keys(e).find((c)=>c == 'publicID') && Object.keys(e).find((c)=>c == 'systemID'))
+							)) ,
+							eIdx = names.findIndex((v)=>Object.entries(v).find(([n,e])=>/^[a-zA-Z]/.test(n)));
+							if (names.constructor.name != values.constructor.name){
+								throw new Error('unsupported format');
 							}
-							n = void(null);
-						}else{
-							object[name] = new JXONTree();
-							var pref = (oNodes[i].prefix) ? '@xmlns:'+oNodes[i].prefix : '@xmlns' ;
-							if (oNodes[i].namespaceURI && !NameSpaces[pref]){
-								object[name][pref] = oNodes[i].namespaceURI;
-								NameSpaces[pref] = object[name][pref];
-							}
-							var oAttr = oNodes[i].attributes;	//ATTRIBUTE_NODE
-							for (var a = 0;a < oAttr.length;a++){
-								object[name]['@'+oAttr[a].nodeName] = parseText(oAttr[a].nodeValue);
-								var pref = (oAttr[a].prefix) ? '@xmlns:'+oAttr[a].prefix : '@xmlns';
-								if (oAttr[a].namespaceURI && !NameSpaces[pref]){
-									object[name][pref] = oAttr[a].namespaceURI;
-									NameSpaces[pref] = object[name][pref];
+						let [H,B,F,T] = [[sIdx,sIdx+1],[sIdx+1,eIdx],[eIdx,eIdx+1],[eIdx+1,]].map(([a,b])=>values.slice(a,b));
+						Array.prototype.push.apply(root,([]).concat([
+							(typeof H == 'object' && H && Object.keys(H).length) 
+								? Object.create(JXONTree.prototype,Object.fromEntries(
+										Object.entries(H[0]).map(([k,v])=>[k,{value:Object.create(JXONTree.prototype,Object.fromEntries(
+											Object.entries(v).map(([n,e])=>[n,{value:e,...DATA}])
+										)),...DATA}])
+									)) 
+								: void(0) ,
+							...B.filter((v)=>Object.keys(v).some((n)=>n == '#comment' || n.startsWith('?')))
+								.map((e)=>Object.create(JXONTree.prototype,Object.fromEntries(
+									Object.entries(e).map(([k,v])=>[k,{value:v,...DATA}])
+								))) ,
+							(await rec(F))[0][1].value ,
+							...Object.values(T).filter((v)=>Object.keys(v).some((n)=>n == '#comment' || n.startsWith('?')))
+								.map((e)=>Object.create(JXONTree.prototype,Object.fromEntries(
+									Object.entries(e).map(([k,v])=>[k,{value:v,...DATA}])
+								))) ,
+						]).filter((c)=>c));
+						Object.values(root).forEach((v)=>{
+							if (typeof v == 'object' && v){
+								Object.defineProperties(v,{
+									'_parent':{
+										get (){
+											return root;
+										}
+									},
+									'_owner':{
+										get (){
+											return owner;
+										}
+									}
+								});
+								if (/^[^@\?\!#0-9]/.test(Object.keys(v)[0])){
+									Object.defineProperties(v,Object.fromEntries(
+										Object.keys(this.#_exlock[targ])
+										.map((n)=>['@xmlns'+(n ? ':' : '')+n,{value:this.#_exlock[targ][n],...DATA}])
+									));
 								}
-								pref = void(null);
+								Object.preventExtensions(v);
 							}
-							oAttr = a = void(null);
-							arguments.callee(oNodes[i] , object[name]);
-						}
-						oNodeLists = void(null);
-						break;
-					case 3 :	//TEXT_NODE
-					case 4 :	//CDATA_SECTION_NODE
-						object['#text'] = parseText(value);
-						break;
-					case 7 :	//PROCESSING_INSTRUCTION_NODE
-						if (name != 'xml'){
-							object['?'+name] = value;
-						};
-						break;
-					case 8 :	//COMMENT_NODE
-						object['#comment'] = value;
-						break;
-					default :
-						break;
-				}
-				name = value = void(null);
-			}
-			oNodes = i = void(null);
-		})(oDoc,this);
-		this.constructor.prototype['$NAMESPACES'] = NameSpaces;
-		NameSpaces = void(null);
-		return this;
-	},
-
-
-
-	toDOM : function(oDocument){
-		var oDocument = oDocument || document;
-		if (!'createElement' in oDocument){return false};
-		var oDiv = oDocument.createElement('div');
-		if (!'appendChild' in oDiv){return false};
-		var oRoot = ('createDocumentFragment' in oDocument) ? oDocument.createDocumentFragment() : oDiv ;
-		var NameSpaces = this.constructor.prototype['$NAMESPACES'];
-		(function(object,oNode){
-			for (var p in object){
-				if (object[p] == null || object[p].constructor != Function){
-					if (/^(@xmlns:?[\w\-]*)|\?xml|\$([\w]+)?$/.test(p)){
-					}else if (/^\?([\w\-]+)$/.test(p)){
-						if ('createProcessingInstruction' in oDocument){
-							oNode.appendChild(oDocument.createProcessingInstruction(/^\?([\w\-]+)$/.exec(p)[1] , unescapeJS(object[p]).replace(/\?\>/gm,"&#03f;&gt;")));
-						}
-					}else if (/^@([\w\-]+:?[\w\-]*)$/.test(p)){
-						var key = /^@([\w\-]+):?([\w\-]*)$/.exec(p);
-						var prefix = (key[2]) ? '@xmlns:'+key[1] : '@xmlns';
-						var value = unescapeJS(object[p]);
-						if ('setAttributeNS' in oNode && NameSpaces[prefix]){
-							oNode.setAttributeNS(NameSpaces[prefix] , ((key[2]) ? ''+key[1]+':'+key[2] : key[1]) , value);
-						}else{
-							oNode.setAttribute((key[2]) ? key[2] : key[1] , value);
-						}
-						key = prefix = value = void(null);
-					}else if (/^#text$/i.test(p)){
-						if (object[p]){
-							oNode.appendChild((hasMarkup(object[p]) && ('createCDATASection' in oDocument && oDiv.tagName == 'div')) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
-						}
-					}else if(/^#comment$/i.test(p)){
-						if ('createComment' in oDocument){
-							oNode.appendChild(oDocument.createComment(unescapeJS(object[p]).replace(/\-\-/gm,"\\-\\-")));
-						}
-					}else{
-						var key = /^([\w\-]+):?([\w\-]*)$/.exec(p);
-						var prefix = (key[2]) ? '@xmlns:'+key[1] : '@xmlns';
-						if (object[p] instanceof Array){
-							for (var i = 0;i < object[p].length;i++){
-								arguments.callee(object[p][i] , oNode.appendChild(('createElementNS' in oDocument && NameSpaces[prefix]) ? oDocument.createElementNS(NameSpaces[prefix] , p) : oDocument.createElement((key[2]) ? key[2] : key[1])));
+						});
+						Object.defineProperty(root,'length',{value:Object.keys(root).length,writable:true});
+						this.#_ = root;
+						Object.preventExtensions(root);
+						Object.defineProperty(this,'length',{
+							get (){
+								return root.length;
+							},set (p){
+								root.length = p;
 							}
-							i = void(null);
-						}else{
-							var oElement = ('createElementNS' in oDocument && NameSpaces[prefix]) ? oDocument.createElementNS(NameSpaces[prefix] , p) : oDocument.createElement((key[2]) ? key[2] : key[1] ) ;
-							if (object[p] instanceof JXONTree){
-								arguments.callee(object[p] , oNode.appendChild(oElement));
-							}else{
-								if(parseText(object[p]) != null){
-									oNode.appendChild(oElement).appendChild((hasMarkup(object[p]) &&('createCDATASection' in oDocument && oDiv.tagName == 'div')) ? oDocument.createCDATASection(unescapeJS(object[p])) : oDocument.createTextNode(unescapeJS(object[p])));
-								}else{
-									oNode.appendChild(oElement);
-								}
+						});
+						return Object.defineProperties(this,Object.fromEntries(
+							Object.values(root).map((k,i)=>[i,{
+								get (){
+									return root[i];
+								},
+								set(p){
+									root[i] = p;
+								},enumerable:true
+							}])
+						));
+					})
+					.then((w)=>{
+						this.dispatchEvent(new CustomEvent('done',{
+							detail:{
+								result:this ,
+								resultType:0
 							}
-							oElement = void(null);
-						}
-						key = prefix = void(null);
-					}
-				}
-				p = void(null);
-			}
-		})(this,oRoot);
-		NameSpaces = oDocument = void(null);
-		return (oRoot.nodeType == 11) ? oRoot : oRoot.childNodes ;
-	},
-
-
-
-	toDOMString : function (oDocument){
-		var oDocument = oDocument || document;
-		if (!'createElement' in oDocument){return false};
-		var oRoot = oDocument.createElement('div');
-		if (!'appendChild' in oRoot){return false};
-		var oNodes = this.toDOM(oDocument);
-		if (oNodes.length){
-			for (var i = 0;i < oNodes.length;i++){
-				oRoot.appendChild(oNodes[i]);
-			}
-			i = void(null);
-		}else{
-			oRoot.appendChild(oNodes);
-		}
-		oNodes = oDocument = void(null);
-		return oRoot.innerHTML;
-	}
-
-}
-
-
-if (!this.JSON){
-
-	JXON.prototype.toJSON = function (){
-		return (function (object){
-			var str = '';
-			if (object instanceof Array){
-				str += '[';
-				for (var i = 0;i < object.length;i++){
-					str += ''+arguments.callee(object[i])+((i < object.length - 1) ? ',' : '');
-				}
-				str += ']';
-			}else if(object instanceof JXON || object instanceof Object){
-				str += '{';
-				for (var p in object){
-					if (object[p] == null || object[p].constructor != Function){
-						str += '"'+p+'":'+arguments.callee(object[p])+',';
-					}
-				}
-				str = str.substring(0, str.length - 1);
-				str += '}';
+						}));
+						return this;
+					})
+					.catch((w)=>{
+						this.dispatchEvent(new CustomEvent('fail',{
+							detail:{
+								message:w
+							}
+						}));
+						return w;
+					})
+					.finally((w)=>{
+						delete this.#_exlock[targ];
+						return w;
+					});
 			}else{
-				switch (typeof(parseText(object))){
-					case 'string':
-						str = '"'+escapeJS(object)+'"';
-						break;
-					case 'number':
-					case 'boolean':
-						str = parseText(object);
-						break;
-					default:
-						str = (parseText(object)) ? object : null;
-					break;
-				}
+				let exlock = this._owner.#_exlock;
+				return Promise.reject(void(0));
 			}
-			return str;
-		})(this);
+		}
+		graft (doc){
+			const [LOCK,DATA] = [{configurable:true} , {enumerable:true}] ,
+				lst = (elem)=>{
+					return (elem.attributes && elem.attributes.length > 0) ? 
+						[...elem.attributes].map((n)=>['@'+n.nodeName,{value:n.nodeValue,...DATA}]) : [] ;
+				},
+				rec = (node)=>{
+					return Promise.all([...node.childNodes].map((e,i)=>{
+						let id , p = new Promise((r,f)=>{
+							id = setTimeout(async()=>{
+								try {
+									let blockNodes;
+									switch(e.nodeType){
+										case 10 :
+											blockNodes = Object.create(JXONTree.prototype,{
+												'!doctype':{value:Object.create(JXONTree.prototype,{
+													'publicID':{value:e.publicId,...DATA},
+													'systemID':{value:e.systemId,...DATA}
+												}),...DATA}
+											});
+											Object.values(blockNodes['!doctype']).map((v)=>Object.preventExtensions(v));
+											Object.preventExtensions(blockNodes['!doctype']);
+											break;
+										default :
+											if (e.namespaceURI){
+												this.#_exlock[targ][e.prefix || ''] = e.namespaceURI;
+											}
+											let res = await rec(e) , 
+												value = Object.create(JXONTree.prototype,Object.fromEntries(
+													lst(e)
+														.concat(res,[
+															['length',{value:Object.values(res).length,writable:true}],
+															['_owner',{get (){return owner}}]
+														])
+														.filter((e)=>e)
+												)) , 
+												name = (e.tagName && !flg) ? e.tagName.toLowerCase() : (e.nodeType === 7 ? '?' : '')+e.nodeName;
+											blockNodes = Object.create(JXONTree.prototype,{
+												[name]:{value:(e.childNodes && e.childNodes.length || e.attributes && e.attributes.length) ? value : 
+													(e.nodeValue || Object.create(JXONTree.prototype)),...DATA}
+											});
+											if (e.prefix === null && this.#_exlock[targ][''] !== e.namespaceURI) Object.defineProperty(blockNodes,'@xmlns',{value:e.namespaceURI,...DATA});
+											if (typeof blockNodes[name] == 'object'){
+												Object.values(blockNodes[name]).forEach((v)=>{
+													if (typeof v == 'object'){
+														Object.defineProperties(v,{
+															'_parent':{
+																get (){
+																	return blockNodes;
+																}
+															},
+															'_owner':{
+																get (){
+																	return owner;
+																}
+															}
+														});
+													}
+													Object.preventExtensions(v);
+												});
+											}
+											Object.preventExtensions(blockNodes[name]);
+											break;
+									}
+									r([i,{value:blockNodes,...DATA}]);
+								}catch(e){
+									f(e);
+								}
+							});
+						});
+						p.id = id;
+						return p;
+					})).then((w)=>w.map((e)=>{
+						if (e) clearTimeout(e.id);
+						return e;
+					}));
+				},
+				flg = doc.createElement('div').tagName == 'div' , 
+				owner = this ,
+				[targ,lock] = [Object.keys(this)[0] || 'this object',Object.create(null)];
+			if (this.constructor.name == 'JXON'){
+				if (targ in this.#_exlock){
+					return Promise.reject(''+targ+' is locked');
+				}
+				this.#_exlock = Object.create(null,{[targ]:{value:lock,...LOCK}});
+				return rec(doc)
+					.then((w)=>{
+						const root = Object.create(JXONTree.prototype,Object.fromEntries(w));
+						Object.values(root).forEach((v)=>{
+							if (typeof v == 'object'){
+								Object.defineProperties(v,{
+									'_parent':{
+										get (){
+											return root;
+										}
+									},
+									'_owner':{
+										get (){
+											return owner;
+										}
+									}
+								});
+								if (/^[^@\?\!#0-9]/.test(Object.keys(v)[0])){
+									Object.defineProperties(v,Object.fromEntries(
+										Object.keys(this.#_exlock[targ])
+										.map((n)=>['@xmlns'+(n ? ':' : '')+n,{value:this.#_exlock[targ][n],...DATA}])
+									));
+								}
+								Object.preventExtensions(v);
+							}
+						});
+						Object.defineProperty(root,'length',{value:Object.keys(root).length,writable:true});
+						this.#_ = root;
+						Object.preventExtensions(root);
+						Object.defineProperty(this,'length',{
+							get (){
+								return root.length;
+							},
+							set (p){
+								root.length = p;
+							}
+						});
+						return Object.defineProperties(this,Object.fromEntries(
+							w.map(([k,v])=>[k,{
+								get (){
+									return root[k];
+								},
+								set (p){
+									root[k] = p;
+								},enumerable:true
+							}])
+						));
+					})
+					.then((w)=>{
+						this.dispatchEvent(new CustomEvent('done',{
+							detail:{
+								result:this ,
+								resultType:0
+							}
+						}));
+						return this;
+					})
+					.catch((w)=>{
+						this.dispatchEvent(new CustomEvent('fail',{
+							detail:{
+								message:w
+							}
+						}));
+						return w;
+					})
+					.finally((w)=>{
+						delete this.#_exlock[targ];
+						return w;
+					});
+			}else{
+				let exlock = this._owner.#_exlock;
+				return Promise.reject(void(0));
+			}
+		}
+		write (opt){
+			const idx = Object.keys(this).findIndex((k)=>Object.keys(this[k]).find((e)=>(/^[^@\?\!#0-9]/).test(e))),
+				name = Object.keys(this[idx])[0] ,
+				URI = Object.fromEntries(
+						Object.keys(this[idx]).filter((e)=>e.includes('@xmlns')).map((e)=>[
+							e.replace('@xmlns','').replace(':',''),
+							this[idx][e]
+						])
+					) , 
+				flg = (opt && name.toLowerCase().split(':').at(-1).includes('html') && 
+					(URI[name.split(':')[0]] == 'http://www.w3.org/1999/xhtml' || URI[''] == 'http://www.w3.org/1999/xhtml')) ,
+				doc = (flg) 
+					? document.implementation.createHTMLDocument() 
+					: document.implementation.createDocument(URI[Object.keys(URI).find((e)=>name.split(':')[0].includes(e))] || URI[''] || null,name,null) ,
+				rec = (o,node)=>{
+					return Promise.all(Object.entries(o).map(([k,v])=>{
+						let id , p = new Promise((r,f)=>{
+							id = setTimeout(async()=>{
+								try {
+									if (isNaN(k)){
+										if (k.startsWith('#')){
+											switch (k){
+												case '#text':
+													r(node.appendChild(doc.createTextNode(v)));
+													break;
+												case '#comment':
+													r(node.appendChild(doc.createComment(v)));
+													break;
+												default :
+													if (!flg && k == '#cdata-section'){
+														r(node.appendChild(doc.createCDATASection(v)));
+													}else{
+														r(void(0));
+													}
+													break;
+											}
+										}else if (k.startsWith('@')){
+											if (k.includes('@xmlns')){
+												r(void(0));
+											}else{
+												let ns = (k.includes(':')) ? URI[Object.keys(URI).find((e)=>k.split(':')[0].includes(e))] : null;
+												r((flg) ? node.setAttribute(k.slice(1).split(':').at(-1),v) : node.setAttributeNS(ns,k.slice(1),v));
+											}
+										}else{
+											if (!flg && k.startsWith('?')){
+												r(node.appendChild(doc.createProcessingInstruction(k.slice(1),v)));
+											}else{
+												let ns = URI[Object.keys(URI).find((e)=>k.split(':')[0].includes(e))] || o['@xmlns'] || URI[''] || null ,
+													elem = node.appendChild((flg) ? doc.createElement(k.split(':').at(-1)) : doc.createElementNS(ns,k));
+												r((v !== null && Object.keys(v).length) ? await rec(v,elem) : elem );
+											}
+										}
+									}else{
+										r(await rec(v,node));
+									}
+								}catch(e){
+									f(e);
+								}
+							});
+						});
+						p.id = id;
+						return p;
+					})).then((w)=>w.map((e)=>{
+						if (e) clearTimeout(e.id);
+						return e;
+					}));
+				}
+			[...doc.documentElement.children].forEach((e)=>{
+				e.remove();
+			});
+			Object.values(this).slice(0,idx).reverse().map((e)=>Object.entries(e)[0]).reduce((c,[k,v])=>{
+				if (k == '!doctype' && doc.doctype === null){
+					c = doc.insertBefore(document.implementation.createDocumentType(name,v.publicID || '',v.systemID || ''),c);
+				}else if (k == '#comment'){
+					c = doc.insertBefore(doc.createComment(v),c);
+				}else if (!flg && k.startsWith('?')){
+					c = doc.insertBefore(doc.createProcessingInstruction(k.slice(1),v),c);
+				}
+				return c;
+			},doc.documentElement);
+			Object.values(this).slice(idx).map((e)=>Object.entries(e)[0]).reduce((c,[k,v])=>{
+				if (k == '#comment'){
+					c = doc.appendChild(doc.createComment(v));
+				}else if (!flg && k.startsWith('?')){
+					c = doc.appendChild(doc.createProcessingInstruction(k.slice(1),v));
+				}
+				return c;
+			});
+			return rec(this[idx][name],doc.documentElement)
+				.then((w)=>{
+					this.dispatchEvent(new CustomEvent('done',{
+						detail:{
+							result:doc ,
+							resultType:(flg) ? 3 : 2
+						}
+					}));
+					return doc;
+				})
+				.catch((w)=>{
+					this.dispatchEvent(new CustomEvent('fail',{
+						detail:{
+							message:w
+						}
+					}));
+					return w;
+				});
+		}
 	}
-}
-
-
-JXONTree.prototype = JXON.prototype;
-JXONTree.prototype.constructor = JXONTree;
-
-
+	class JXON extends JXONTree {
+		constructor(){
+			super();
+		}
+		build(obj){
+			if ('documentElement' in obj){
+				return super.graft(obj);
+			}else{
+				return super.branch(obj);
+			}
+		}
+		unbuild(flg){
+			return super.write(flg);
+		}
+		stringify(){
+			return super.stringify();
+		}
+	}
+//}
