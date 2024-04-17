@@ -34,6 +34,20 @@ textarea[name="input"] , #oCode {
 	white-space:pre;
 	overflow-x:auto;
 	font-size: 16pt;
+	resize:none;
+}
+.droppable{
+	animation:blinking 0.7s ease-in-out 0s infinite alternate both;		
+}
+@keyframes blinking{
+	from {
+		color:black;
+		background-color: rgb(255,255,255);
+	}
+	to {
+		color:white;
+		background-color:rgb(0,128,255);
+	}
 }
 input[type="checkbox"] {
 	display:none;
@@ -63,30 +77,29 @@ input[type="checkbox"]:checked + label {
 	min-height:200px;
 	border:3px groove black;
 }
-#output div textarea{
+#output > div > textarea{
 	width:98%;
 	height:88%;
 	margin:auto;
 	overflow-x: auto;
 	border:thin solid gray;
 	font-size: 16pt;
+	resize:none;
 }
-
 /*-->*/</style>
 </head>
 <body>
 <h1>JXON 2.0 Demo / Example (JXON Converter)</h1>
 <form>
-<div onselectstart="event.preventDefault();">
-<span>input:</span>
-<input type="radio" name="type" value="JSON" id="JSON" checked><label for="JSON">JSON</label><input type="radio" name="type" value="XML" id="XML"><label for="XML">XML</label><input type="radio" name="type" value="HTML" id="HTML"><label for="HTML">HTML</label>
-<button type="button" onclick="location.reload(true);">Reload</button>
-<button type="button" onclick="clr(event)">CLS</button>
-</div>
 <div id="content">
 <div>
-data:
-<textarea name="input" spellcheck="false" autocomplete="off" autofocus ondragover="event.preventDefault();" ondrop="(async(e)=>{e.preventDefault();let oFile = e.dataTransfer.files[0];load(await oFile.text(),['json','xml','html'].find((f)=>oFile.type.includes(f)) || 'json');})(event)">[{"!doctype":{"publicID":"","systemID":""}},{"?xml-stylesheet":"href=\"#\" type=\"text/xsl\" "},{"#comment":" comment "},{"xsl:stylesheet":[{"#text":"\n"},{"xsl:output":{"@method":"xml"}},{"#text":"\n"},{"xsl:template":[{"#text":"\n"},{"html":[{"#text":"\n"},{"head":[{"#text":"\n"},{"title":[{"#text":"example"}]},{"#text":"\n"}]},{"#text":"\n"},{"body":[{"#text":"\n"},{"script":[{"#cdata-section":"//<!--\nalert(\"\");\n//-->"}]},{"#text":"\n"},{"#comment":"\ncomment\n"},{"#text":"\n"}]},{"#text":"\n"}],"@xmlns":"http://www.w3.org/1999/xhtml","@lang":"ja"},{"#text":"\n"}],"@match":"/"},{"#text":"\n"}],"@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@version":"1.0","@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@xmlns":"http://www.w3.org/1999/xhtml"}]</textarea>
+	<span onselectstart="event.preventDefault();">
+		<span>input:</span>
+		<input type="radio" name="type" value="JSON" id="JSON" checked><label for="JSON">JSON</label><input type="radio" name="type" value="XML" id="XML"><label for="XML">XML</label><input type="radio" name="type" value="HTML" id="HTML"><label for="HTML">HTML</label>
+		<button type="button" onclick="location.reload(true);">Reload</button>
+		<button type="button" onclick="clr(event)">CLS</button>
+	</span>
+<textarea name="input" spellcheck="false" autocomplete="off" autofocus>[{"!doctype":{"publicID":"","systemID":""}},{"?xml-stylesheet":"href=\"#\" type=\"text/xsl\" "},{"#comment":" comment "},{"xsl:stylesheet":[{"#text":"\n"},{"xsl:output":{"@method":"xml"}},{"#text":"\n"},{"xsl:template":[{"#text":"\n"},{"html":[{"#text":"\n"},{"head":[{"#text":"\n"},{"title":[{"#text":"example"}]},{"#text":"\n"}]},{"#text":"\n"},{"body":[{"#text":"\n"},{"script":[{"#cdata-section":"//<!--\nalert(\"\");\n//-->"}]},{"#text":"\n"},{"#comment":"\ncomment\n"},{"#text":"\n"}]},{"#text":"\n"}],"@xmlns":"http://www.w3.org/1999/xhtml","@lang":"ja"},{"#text":"\n"}],"@match":"/"},{"#text":"\n"}],"@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@version":"1.0","@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@xmlns":"http://www.w3.org/1999/xhtml"}]</textarea>
 </div>
 <div>
 code:
@@ -155,6 +168,27 @@ HTML:
 </div>
 </div>
 <script>//<!--
+document.body.ondragover = (e)=>{
+	e.preventDefault();
+	if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')){
+		e.dataTransfer.effectAllowed = 'move';
+		document.forms[0].input.classList.add('droppable');
+	}
+};
+document.body.ondrop = document.body.ondragend = document.body.ondragleave = (e)=>{
+	e.preventDefault();
+	if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')){
+		document.forms[0].input.classList.remove('droppable');
+	}
+};
+document.forms[0].input.ondragover = (e)=>e.preventDefault();
+document.forms[0].input.ondrop = async(e)=>{
+	e.preventDefault();
+	e.dataTransfer.dropEffect = 'move';
+	if (e.dataTransfer && !e.dataTransfer.files.length) return false;
+	let oFile = e.dataTransfer.files[0];
+	load(await oFile.text(),['json','xml','html'].find((f)=>oFile.type.includes(f)) || 'json');
+};
 function exec(e){
 	document.getElementById('oConsole').innerHTML = '';
 	['oJXON','oXML','oHTML'].forEach((x)=>{
