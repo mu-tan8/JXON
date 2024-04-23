@@ -97,15 +97,9 @@ input[type="checkbox"]:checked + label {
 		<span>input:</span>
 		<input type="radio" name="type" value="JSON" id="JSON" checked><label for="JSON">JSON</label><input type="radio" name="type" value="XML" id="XML"><label for="XML">XML</label><input type="radio" name="type" value="HTML" id="HTML"><label for="HTML">HTML</label>
 		<button type="button" onclick="location.reload(true);">Reload</button>
-<<<<<<< Updated upstream
-		<button type="button" onclick="clr(event)">CLS</button>
-	</span>
-<textarea name="input" spellcheck="false" autocomplete="off" autofocus>[{"!doctype":{"publicID":"","systemID":""}},{"?xml-stylesheet":"href=\"#\" type=\"text/xsl\" "},{"#comment":" comment "},{"xsl:stylesheet":[{"#text":"\n"},{"xsl:output":{"@method":"xml"}},{"#text":"\n"},{"xsl:template":[{"#text":"\n"},{"html":[{"#text":"\n"},{"head":[{"#text":"\n"},{"title":[{"#text":"example"}]},{"#text":"\n"}]},{"#text":"\n"},{"body":[{"#text":"\n"},{"script":[{"#cdata-section":"//<!--\nalert(\"\");\n//-->"}]},{"#text":"\n"},{"#comment":"\ncomment\n"},{"#text":"\n"}]},{"#text":"\n"}],"@xmlns":"http://www.w3.org/1999/xhtml","@lang":"ja"},{"#text":"\n"}],"@match":"/"},{"#text":"\n"}],"@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@version":"1.0","@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@xmlns":"http://www.w3.org/1999/xhtml"}]</textarea>
-=======
 		<button type="button" onclick="clr(event)">CLR</button>
 	</span>
 <textarea name="input" spellcheck="false" autocomplete="off" autofocus ondragover="event.preventDefault();" ondrop="(async(e)=>{e.preventDefault();let oFile = e.dataTransfer.files[0];load(await oFile.text(),['json','xml','html'].find((f)=>oFile.type.includes(f)) || 'json');})(event)">[{"!doctype":{"publicID":"","systemID":""}},{"?xml-stylesheet":"href=\"#\" type=\"text/xsl\" "},{"#comment":" comment "},{"xsl:stylesheet":[{"#text":"\n"},{"xsl:output":{"@method":"xml"}},{"#text":"\n"},{"xsl:template":[{"#text":"\n"},{"html":[{"#text":"\n"},{"head":[{"#text":"\n"},{"title":[{"#text":"example"}]},{"#text":"\n"}]},{"#text":"\n"},{"body":[{"#text":"\n"},{"script":[{"#cdata-section":"//<!--\nalert(\"\");\n//-->"}]},{"#text":"\n"},{"#comment":"\ncomment\n"},{"#text":"\n"}]},{"#text":"\n"}],"@xmlns":"http://www.w3.org/1999/xhtml","@lang":"ja"},{"#text":"\n"}],"@match":"/"},{"#text":"\n"}],"@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@version":"1.0","@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@xmlns":"http://www.w3.org/1999/xhtml"}]</textarea>
->>>>>>> Stashed changes
 </div>
 <div>
 Example Code:
@@ -198,27 +192,6 @@ HTML:
 </div>
 </div>
 <script>//<!--
-document.body.ondragover = (e)=>{
-	e.preventDefault();
-	if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')){
-		e.dataTransfer.effectAllowed = 'move';
-		document.forms[0].input.classList.add('droppable');
-	}
-};
-document.body.ondrop = document.body.ondragend = document.body.ondragleave = (e)=>{
-	e.preventDefault();
-	if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')){
-		document.forms[0].input.classList.remove('droppable');
-	}
-};
-document.forms[0].input.ondragover = (e)=>e.preventDefault();
-document.forms[0].input.ondrop = async(e)=>{
-	e.preventDefault();
-	e.dataTransfer.dropEffect = 'move';
-	if (e.dataTransfer && !e.dataTransfer.files.length) return false;
-	let oFile = e.dataTransfer.files[0];
-	load(await oFile.text(),['json','xml','html'].find((f)=>oFile.type.includes(f)) || 'json');
-};
 function exec(e){
 	document.getElementById('oConsole').innerHTML = '';
 	['oJXON','oXML','oHTML'].forEach((x)=>{
