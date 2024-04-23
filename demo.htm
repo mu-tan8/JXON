@@ -88,7 +88,7 @@ input[type="checkbox"]:checked + label {
 }
 /*-->*/</style>
 </head>
-<body>
+<body ondragover="if (event.dataTransfer && [...event.dataTransfer.types].includes('Files')){event.preventDefault();document.forms[0].input.classList.add('droppable');}" ondragleave="if (event.dataTransfer && event.dataTransfer.types){event.preventDefault();document.forms[0].input.classList.remove('droppable');}" ondragend="if (event.dataTransfer && event.dataTransfer.types){event.preventDefault();document.forms[0].input.classList.remove('droppable');}" ondrop="if (event.dataTransfer && event.dataTransfer.types){event.preventDefault();document.forms[0].input.classList.remove('droppable');}">
 <h1>JXON 2.0 Demo / Example (JXON Converter)</h1>
 <form>
 <div id="content">
@@ -97,12 +97,18 @@ input[type="checkbox"]:checked + label {
 		<span>input:</span>
 		<input type="radio" name="type" value="JSON" id="JSON" checked><label for="JSON">JSON</label><input type="radio" name="type" value="XML" id="XML"><label for="XML">XML</label><input type="radio" name="type" value="HTML" id="HTML"><label for="HTML">HTML</label>
 		<button type="button" onclick="location.reload(true);">Reload</button>
+<<<<<<< Updated upstream
 		<button type="button" onclick="clr(event)">CLS</button>
 	</span>
 <textarea name="input" spellcheck="false" autocomplete="off" autofocus>[{"!doctype":{"publicID":"","systemID":""}},{"?xml-stylesheet":"href=\"#\" type=\"text/xsl\" "},{"#comment":" comment "},{"xsl:stylesheet":[{"#text":"\n"},{"xsl:output":{"@method":"xml"}},{"#text":"\n"},{"xsl:template":[{"#text":"\n"},{"html":[{"#text":"\n"},{"head":[{"#text":"\n"},{"title":[{"#text":"example"}]},{"#text":"\n"}]},{"#text":"\n"},{"body":[{"#text":"\n"},{"script":[{"#cdata-section":"//<!--\nalert(\"\");\n//-->"}]},{"#text":"\n"},{"#comment":"\ncomment\n"},{"#text":"\n"}]},{"#text":"\n"}],"@xmlns":"http://www.w3.org/1999/xhtml","@lang":"ja"},{"#text":"\n"}],"@match":"/"},{"#text":"\n"}],"@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@version":"1.0","@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@xmlns":"http://www.w3.org/1999/xhtml"}]</textarea>
+=======
+		<button type="button" onclick="clr(event)">CLR</button>
+	</span>
+<textarea name="input" spellcheck="false" autocomplete="off" autofocus ondragover="event.preventDefault();" ondrop="(async(e)=>{e.preventDefault();let oFile = e.dataTransfer.files[0];load(await oFile.text(),['json','xml','html'].find((f)=>oFile.type.includes(f)) || 'json');})(event)">[{"!doctype":{"publicID":"","systemID":""}},{"?xml-stylesheet":"href=\"#\" type=\"text/xsl\" "},{"#comment":" comment "},{"xsl:stylesheet":[{"#text":"\n"},{"xsl:output":{"@method":"xml"}},{"#text":"\n"},{"xsl:template":[{"#text":"\n"},{"html":[{"#text":"\n"},{"head":[{"#text":"\n"},{"title":[{"#text":"example"}]},{"#text":"\n"}]},{"#text":"\n"},{"body":[{"#text":"\n"},{"script":[{"#cdata-section":"//<!--\nalert(\"\");\n//-->"}]},{"#text":"\n"},{"#comment":"\ncomment\n"},{"#text":"\n"}]},{"#text":"\n"}],"@xmlns":"http://www.w3.org/1999/xhtml","@lang":"ja"},{"#text":"\n"}],"@match":"/"},{"#text":"\n"}],"@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@version":"1.0","@xmlns:xsl":"http://www.w3.org/1999/XSL/Transform","@xmlns":"http://www.w3.org/1999/xhtml"}]</textarea>
+>>>>>>> Stashed changes
 </div>
 <div>
-code:
+Example Code:
 <textarea id="oCode" readOnly>
 let j = new JXON(), parser = (o,t)=>{
 	let ret = o;
@@ -117,14 +123,35 @@ let j = new JXON(), parser = (o,t)=>{
 			ret = new DOMParser().parseFromString(ret,'text/html');
 			break;
 		default:
-			alert(t);
+			console.log(t);
 			break;
 	}
 	return ret;
+} , step = (oProgress)=>{
+	cnt++;
+	oProgress.value = cnt;
+	oProgress.textContent = document.querySelector('label[for="'+oProgress.id+'"]').textContent
+	 = 'Step '+oProgress.value+' of '+oProgress.max+'';
 };
-let lst = [...$output].filter((c)=>c.checked).map((c)=>c.value);
-j.ondone = (e)=>{console.log('[done]:',e.detail.result)};
-j.onfail = (e)=>{console.log('[fail]:',e.detail.message)};
+$button.disabled = true;  // ExecCode button lock
+let prog = $button.insertAdjacentElement('afterend',document.createElement('span')),
+	 cnt = 0,
+	 lst = [...$output].filter((c)=>c.checked).map((c)=>c.value), // get some Selected OutputType Checkbox Status
+	 oProgress = prog.appendChild(document.createElement('progress'));
+oProgress.id = 'proc';
+oProgress.max = lst.length + 1;
+prog.appendChild(document.createElement('label')).htmlFor = oProgress.id;
+document.querySelector('label[for="'+oProgress.id+'"]').textContent = 'Now Loading...';
+
+/*** Main Code Begin ***/
+j.ondone = (e)=>{
+	console.log('[done]:',e.detail.result);
+	step(document.getElementById('proc')); // progress-bar increment
+};
+j.onfail = (e)=>{
+	console.log('[fail]:',e.detail.message);
+	step(document.getElementById('proc')); // progress-bar increment
+};
 j.build(parser($input.value,$type.value))
 .then((w)=>Promise.all([
 	(lst.includes('JXON')) ? w.stringify().then((x)=>$oJXON.value = x) : Promise.resolve() ,
@@ -134,7 +161,10 @@ j.build(parser($input.value,$type.value))
 .finally((w)=>{
 	j = void(0);
 	console.log('fin.');
-});</textarea>
+	prog.remove();
+	$button.disabled = false; // ExecCode button unlock
+});
+/*** Main Code End ***/</textarea>
 </div>
 <div>
 console:
@@ -144,7 +174,7 @@ console:
 <div onselectstart="event.preventDefault();">
 <span>output:</span>
 <input type="checkbox" name="output[]" value="JXON" id="output-JXON"><label for="output-JXON">JXON</label><input type="checkbox" name="output[]" value="XML" id="output-XML" checked><label for="output-XML">XML</label><input type="checkbox" name="output[]" value="HTML" id="output-HTML" checked><label for="output-HTML">HTML</label>
-<button type="button" onclick="exec(event)">Exec</button>
+<button type="button" onclick="exec(event)">ExecCode</button>
 </div>
 </form>
 <div id="output">
@@ -196,7 +226,7 @@ function exec(e){
 	});
 	try {
 		(new Function(
-			'console','$input','$output','$type','$oJXON','$oXML','$oHTML','try{'+document.getElementById('oCode').value+'}catch(e){console.log(e);};'
+			'console','$input','$output','$button','$type','$oJXON','$oXML','$oHTML','try{'+document.getElementById('oCode').value+'}catch(e){console.log(e);};'
 		))(
 			{
 				log:(...arg)=>{
@@ -207,6 +237,7 @@ function exec(e){
 			},
 			e.target.form.elements['input'],
 			e.target.form.elements['output[]'],
+			e.target,
 			e.target.form.elements['type'],
 			document.getElementById('oJXON'),
 			document.getElementById('oXML'),
